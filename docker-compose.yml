@@ -20,7 +20,7 @@ services:
    #    command:
 
 
-   RSMBCD:
+   rmbscd:
       tty: true
       build: .
       ports:
@@ -28,12 +28,12 @@ services:
          - '8888:8888' #Notebook port
          - '6006:6006' # Tensorboard
 
-      container_name: 'RSMBCD'
+      container_name: 'rmbscd'
       volumes:
          - ./:/appli
 
       networks:
-         - RSMBCD_network
+         - rmbscd_network
 
 
       # deploy:
@@ -44,4 +44,4 @@ services:
       #               driver: nvidia
 
 networks:
-   RSMBCD_network:
+   rmbscd_network:

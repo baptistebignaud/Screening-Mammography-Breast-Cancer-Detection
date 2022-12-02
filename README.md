@@ -52,7 +52,7 @@ Be carefull, the repository is built to give the possibility to use a GPU. If yo
 
 ## Open a shell inside the main container<br>
 
-> `docker-compose exec RSMBCD sh `
+> `docker-compose exec rmbscd sh `
 
 ## Run jupyter lab from the container<br>
 

@@ -1,0 +1,47 @@
+version: '3.9'
+services:
+   # RSMBCD_db:
+   #    restart: always
+   #    image: mysql:5.7
+   #    container_name: db
+   #    environment:
+   #       MYSQL_ROOT_PASSWORD: ${ROOT_PWD}
+   #       MYSQL_DATABASE: ${DB}
+   #       MYSQL_USER: ${USERDB}
+   #       MYSQL_PASSWORD: ${USER_PWD}
+   #    ports:
+   #       - '6033:3306'
+   #    volumes:
+   #       - ./:/db
+   #    expose:
+   #       - 3306
+   #    networks:
+   #       - RSMBCD_network
+   #    command:
+
+
+   RSMBCD:
+      tty: true
+      build: .
+      ports:
+         - '4000:4000'
+         - '8888:8888' #Notebook port
+         - '6006:6006' # Tensorboard
+
+      container_name: 'RSMBCD'
+      volumes:
+         - ./:/appli
+
+      networks:
+         - RSMBCD_network
+
+
+      # deploy:
+      #    resources:
+      #       reservations:
+      #          devices:
+      #             - capabilities: [gpu]
+      #               driver: nvidia
+
+networks:
+   RSMBCD_network:

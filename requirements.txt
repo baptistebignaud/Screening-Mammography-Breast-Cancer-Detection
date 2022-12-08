@@ -3,11 +3,14 @@
 ### Data vizualisation and plot
     matplotlib == 3.5.0
     seaborn == 0.11.2
+    plotly
 ### Data analysis 
     pandas == 1.3.4
 ### ML Librairies
-    sklearn 
+    scikit-learn
+    mlrose  
     tensorflow == 2.5.0
+    wandb
 ###Database
     # mysql.connector == 2.2.9
     # pyodbc == 4.0.32
@@ -18,5 +21,6 @@
     tqdm == 4.62.1
 ### Images processing
     opencv-python == 4.5.5.62
+    easyimages==0.8.6
 
     

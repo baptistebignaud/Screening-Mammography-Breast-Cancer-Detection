@@ -1,2 +1,5 @@
 notebooks/.ipynb_checkpoints
+notebooks/iframe_figures
+
 kaggle_dataset
+.DS_Store

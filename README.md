@@ -16,7 +16,11 @@
 
 # Introduction to the topic
 
-TODO
+Input: données tabulaires + des screens de mamographie par patient 
+
+Output: patient positive au cancer ou non.
+
+tabular data: 
 
 # The data
 

@@ -62,6 +62,13 @@ Be carefull, the repository is built to give the possibility to use a GPU. If yo
 
 > `jupyter lab --ip 0.0.0.0 --allow-root`
 
+## If some issues with jupyter lab or port already on used on 8888
+
+> `lsof -i :8888`
+> `kill -9 <PID>`
+With PID being the process ID of python (for notebook)
+
 # References
 
 TODO
+

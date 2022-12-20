@@ -1,5 +1,10 @@
+# Checkpoints and figures from notebooks
 notebooks/.ipynb_checkpoints
 notebooks/iframe_figures
 
+# Dataset (to big to be loaded)
 kaggle_dataset
+
+# Some caches
 .DS_Store
+/utile/__pycache__

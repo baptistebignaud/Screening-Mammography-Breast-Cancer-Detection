@@ -1,14 +1,26 @@
+# os and diverse librairies
 import os
-import random
-from PIL import Image
-import matplotlib.pyplot as plt
-from typing import List
+from os import listdir
 import warnings
-import numpy as np
-import seaborn as sns
-from scipy.stats import kde
+import random
+from typing import List
+from random import sample
+
+# Images librairies
+from PIL import Image
 import cv2
+
+# Plot librairies
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Math and data manipulation librairies
+import numpy as np
 import math
+import pandas as pd
+
+# Librairies for basics manipulation on file
+import six
 
 
 def load_file(files: str or List[str] or List[np.array], n: int, m: int = None) -> List:
@@ -152,14 +164,13 @@ def plot_img_hist(
     nb_bins_hist: int = 20,
 ) -> None:
     """
-    Plot n*m random sample of images or a list of images into a grid
+    Plot n plots of images and associated histograms and kde plot
 
     files: The path of the folder in which images are stored or list of paths of images or list of images
     n: Number of rows for the plot
+    widths: List of widths for figures
+    heights: List of heights for figures
     source: Either PNG or DCOM format
-    title: The title of the whole figure
-    wspace: Width space between images in the figure
-    hspace: Height space between images in the figure
     seed: Seed of the randomness if one wants reproductible results
     font_size: Font's size of title of the figure
     normalize: If one wants to normalize the image
@@ -220,7 +231,6 @@ def plot_img_hist(
         ax.set_xlabel("Value of pixels")
 
         plt.show()
-    plt.show()
 
 
 def plot_hist_3D(
@@ -246,6 +256,7 @@ def plot_hist_3D(
 
     returns: None
     """
+    sys.modules["sklearn.externals.six"] = six
     import mlrose
     from scipy.interpolate import griddata
     import plotly.offline as pyo
@@ -386,3 +397,154 @@ def plot_hist_3D(
     )
 
     fig.show()
+
+
+def build_list_imgs(
+    df: pd.DataFrame,
+) -> tuple:
+    """
+    Construct list of dataframes of images (filtered by laterality, view and
+    if cancer or not) with associated name
+
+    df: Dataframe with metadata about images
+
+    returns: (List of filtered dataframes images, associated names for labels )
+    """
+
+    # Get possible values and associated labels for each filter
+    cancer, cancer_labels = [0, 1], ["without cancer", "with cancer"]
+    laterality, laterality_labels = ["L", "R"], ["Left view", "Right view"]
+    view, view_labels = ["MLO", "CC"], [
+        "Mediolateral Oblique",
+        "Cranial Caudal",
+    ]
+
+    # Get list of dataframes with filters
+    L_imgs = [
+        df[(df["laterality"] == lat) & ((df["view"] == v)) & ((df["cancer"] == c))]
+        for c in cancer
+        for v in view
+        for lat in laterality
+    ]
+
+    # Get associated names
+    L_names = [
+        f"{lat} {v} {c}"
+        for c in cancer_labels
+        for v in view_labels
+        for lat in laterality_labels
+    ]
+    return L_imgs, L_names
+
+
+def plot_avg_imgs(
+    L_imgs: List,
+    L_names: List,
+    n_samples: int = 100,
+    widths: List[int] = [10, 10],
+    heights: List[int] = [40, 40, 40, 40],
+    title_size: int = 10,
+    fig_size: tuple = (15, 15),
+    seed: int = None,
+) -> None:
+    """
+    Plot average images for each filter onto a grid to see for each
+    laterality, each view and if has cancer or not, the average
+    image.
+
+    L_imgs: List of filtered dataframe (output of build_list_imgs)
+    L_names: List of associated names (output of build_list_imgs)
+    n_samples: Number of samples for the average image
+    widths: List of widths for figures
+    heights: List of heights for figures
+    title_size: Size of the main title
+    fig_size: Figure size
+    seed: Seed of the randomness if one wants reproductible results
+
+    returns: List of images by
+    """
+    if seed:
+        random.seed(seed)
+    if not (len(widths) == 2 and len(heights) == 4):
+        raise Exception("List of widths or heights ratios has not the correct length")
+
+    # Get a sample for each filtered dataframe
+    # TODO check that the number of samples is lower that the shape
+    L_samples = [elem.sample(n=n_samples) for elem in L_imgs]
+
+    # Create list of average image after histogram normalization
+    mean_images = []
+    for sample_elem in L_samples:
+        list_for_mean = []
+        for file in sample_elem["path"]:
+            img = cv2.imread(file)
+            img = cv2.equalizeHist(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))
+            list_for_mean.append(img)
+        list_for_mean = np.array(list_for_mean)
+        mean_img = np.mean(list_for_mean, axis=0) / 255
+        mean_images.append(mean_img)
+    mean_images = np.array(mean_images)
+
+    sns.set_style("dark")
+
+    # Create figure
+    fig = plt.figure(constrained_layout=True, figsize=fig_size)
+
+    spec = fig.add_gridspec(
+        ncols=2, nrows=4, width_ratios=widths, height_ratios=heights
+    )
+
+    # Parameters for the titles
+    params_col = ["Without cancer", "With cancer"]
+    params_rows = [
+        "Left mediolateral Oblique",
+        "Right mediolateral Oblique",
+        "Left Cranial Caudal",
+        "Right Cranial Caudal",
+    ]
+    for row in range(0, 4):
+        for col in range(0, 2):
+
+            ax = fig.add_subplot(spec[row, col])
+
+            # Add columns' titles
+            if row == 0:
+                ax.annotate(
+                    params_col[col],
+                    xy=(0.5, 1),
+                    xytext=(0, 40),
+                    xycoords="axes fraction",
+                    textcoords="offset points",
+                    ha="center",
+                    va="baseline",
+                    fontsize=30,
+                    weight="bold",
+                )
+
+            # Add rows' titles
+            if col == 0:
+                ax.annotate(
+                    params_rows[row],
+                    xy=(0, 0.5),
+                    xytext=(-ax.yaxis.labelpad - 120, 0),
+                    xycoords=ax.yaxis.label,
+                    textcoords="offset points",
+                    ha="center",
+                    va="baseline",
+                    fontsize=15,
+                    weight="bold",
+                )
+            # Set for each plot the title
+            ax.set_title(
+                L_names[
+                    (col + 2 * row) // 2 + ((len(L_names) // 2) * ((col + 2 * row) % 2))
+                ]
+            )
+            ax.title.set_size(title_size)
+            # Plot image
+            plt.imshow(
+                mean_images[
+                    (col + 2 * row) // 2 + ((len(L_names) // 2) * ((col + 2 * row) % 2))
+                ],
+                cmap="gray",
+            )

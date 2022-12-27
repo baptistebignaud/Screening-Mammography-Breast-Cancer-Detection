@@ -285,5 +285,34 @@ class PreProcessingPipeline:
         mask = self.draw_contours(contours, image, biggest=True)[1]
         return cv2.bitwise_and(image, mask)
 
-    def pre_process(self):
-        pass
+    def _remove_line(self, image: np.array, method: str = "delete"):
+        _, lines = self.get_horizontal_lines(image)
+        List_images = self.split_images_lines(image, lines)
+        image_restored = self.restore_image(image, List_images, lines, method=method)
+        return image_restored
+
+    def pre_process(self, images: np.array or List[np.array]):
+        if isinstance(images, np.array):
+            images = [images]
+        for image in images:
+            image = self._to_gray(image, method_to_gray=self.method_to_gray)
+            if self.remove_annotation:
+                image = self._remove_annotation(image)
+            if self.remove_line:
+                image = self._remove_line(image, method=self.remove_line)
+                pass
+            if self.normalization:
+                image = self.normalize(image, method=self.normalization)
+            if self.denoising:
+                # TODO #image = self.
+                pass
+            if self.gamma_correction:
+                # TODO #image = self.
+                pass
+            if self.background_uniformity:
+                # TODO #image = self.
+                pass
+            if self.sharpening:
+                # TODO #image = self.
+                pass
+        return image

@@ -83,8 +83,8 @@ Be carefull, the repository is built to give the possibility to use a GPU. If yo
 
 ## If some issues with jupyter lab or port already on used on 8888
 
-> `lsof -i :8888`
-> `kill -9 <PID>`
+> `lsof -i :8888` <br>
+> `kill -9 <PID>` <br>
 With PID being the process ID of python (for notebook)
 
 # References

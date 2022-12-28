@@ -6,25 +6,27 @@ from typing import List
 class PreProcessingPipeline:
     def __init__(
         self,
-        method_to_gray: str = None,
+        method_to_gray: str = "default",
         remove_annotation: bool = True,
-        remove_line: str = "delete",
-        normalization: str = "clahe",
-        denoising: str = "fastNlMeans",
-        gamma_correction: float = 2.2,
-        background_uniformity: bool = False,
+        remove_line: bool = False,
+        normalization: bool = True,
+        denoising: bool = False,
         sharpening: bool = False,
+        gamma_correction: bool = False,
+        inverted_image: bool = False,
+        **methods_args,
     ) -> None:
         """
         Constructor of the pre processing pipeline
 
+        method_to_gray: Which method to use to convert image in gray scale
         remove_annotation: If one wants to remove annotation in the pre-processing
-        remove_line: Which method one wants to use to remove horizontal lines in the pre-processing (could be None)
-        normalization: Which method one wants to use to normalize histograms in the pre-processing (could be None)
-        denoising: Which method one wants to denoize images in the pre-processing (could be None)
-        gamma_correction: Which value of gamma if one wants to gamma correct images in the pre-processing (could be None)
-        background_uniformity: TODO
+        remove_line: If one wants to use to remove horizontal white bands in the pre-processing
+        normalization: If one wants to use to normalize histograms in the pre-processing
+        denoising: If one wants to to denoize images in the pre-processing
+        gamma_correction: If one wants to gamma correct images in the pre-processing
         sharpening: TODO
+        **methods_args: All possible parameters for functions in pre-processing
 
         returns: None
         """
@@ -33,12 +35,175 @@ class PreProcessingPipeline:
         self.remove_line = remove_line
         self.normalization = normalization
         self.denoising = denoising
-        self.gamma_correction = gamma_correction
-        self.background_uniformity = background_uniformity
         self.sharpening = sharpening
+        self.gamma_correction = gamma_correction
+        self.inverted_image = inverted_image
+
+        # Default values for preprocessing that you can change in calling the constructor of the Pipeline class
+        # Methods to adopt in the pipeline for each step
+        self.denoising_method = "NlMD"
+        self.normalization_method = "clahe"
+        self.remove_line_method = "delete"
+
+        # Arguments about contours detection
+        self.contours_low = 5
+        self.contours_high = 255
+
+        # Arguments about gamma correction
+        self.gamma_correction_value = 2.2
+
+        # Arguments about detection of lines
+        self.horizontal_lines_LMIN = 400
+        self.horizontal_lines_LMAX = 500
+        self.horizontal_lines_minLineLength = 100
+        self.horizontal_lines_maxLineGap = 20
+        self.horizontal_lines_alpha = 0.1
+        self.houghlineP_threshold = 50
+
+        # Arguments for normalization with CLAE
+        self.clahe_clipLimit = 2.0
+        self.clahe_tileGridSize = (10, 10)
+
+        # Arguments for denoising
+        self.denoise_h = 3
+        self.denoise_block_size = 7
+        self.denoise_search_window = 21
+
+        # Possibilty to adjust parameters
+        self.__dict__.update(methods_args)
+
+    def pre_process(
+        self, images: np.array or List[np.array]
+    ) -> List[np.array] or np.array:
+        """
+        Global preprocessing function
+
+        images: Image or list of images to pre-process
+
+        returns: Image or list of images pre-processed
+        """
+        if not isinstance(images, List):
+            images = [images]
+
+        # Apply pre-processing for each image
+        for i, image in enumerate(images):
+            image = self._to_gray(image, method_to_gray=self.method_to_gray)
+
+            if self.remove_annotation:
+                image, mask = self._remove_annotation(
+                    image, thresh_high=self.contours_high, thresh_low=self.contours_low
+                )
+
+            if self.remove_line:
+                image = self._remove_line(
+                    image,
+                    method=self.remove_line_method,
+                    LMIN=self.horizontal_lines_LMIN,
+                    LMAX=self.horizontal_lines_LMAX,
+                    minLineLength=self.horizontal_lines_minLineLength,
+                    maxLineGap=self.horizontal_lines_maxLineGap,
+                    alpha=self.horizontal_lines_alpha,
+                )
+
+            if self.normalization:
+                if self.normalization_method == "clahe":
+                    image = self.normalize(
+                        image,
+                        method=self.normalization_method,
+                        clahe_clipLimit=self.clahe_clipLimit,
+                        clahe_tileGridSize=self.clahe_tileGridSize,
+                    )
+                elif self.normalization_method == "global":
+                    image = self.normalize(image, method=self.normalization_method)
+
+            if self.denoising:
+                image = self.denoise(
+                    image,
+                    method=self.denoising_method,
+                    h=self.denoise_h,
+                    block_size=self.denoise_block_size,
+                    search_window=self.denoise_search_window,
+                )
+
+            if self.gamma_correction:
+                image = self.gamma_correct(image, gamma=self.gamma_correction_value)
+
+            if self.sharpening:
+                # TODO #image = self.
+                pass
+
+            image = cv2.bitwise_and(image, mask)
+
+            if self.inverted_image:
+                image = self.invert_image(image)
+
+            # Change image by pre processed image
+            images[i] = image
+
+        if len(images) == 1:
+            return images[0]
+        return images
+
+    def _remove_annotation(
+        self, image: np.array, thresh_high: int = 255, thresh_low: int = 5
+    ):
+        """
+        Remove annotation in image
+
+        image: The screening mammography
+
+        returns: Image without annotation
+        """
+        contours = self.get_contours(
+            image, thresh_low=thresh_low, thresh_high=thresh_high
+        )
+        mask = self.draw_contours(contours, image, biggest=True)[1]
+        return cv2.bitwise_and(image, mask), mask
+
+    def _remove_line(
+        self,
+        image: np.array,
+        LMIN,
+        LMAX,
+        minLineLength,
+        maxLineGap,
+        alpha,
+        method: str = "delete",
+    ):
+        """
+        Very experimetal, remove horizontal white bands in some images
+
+        image: The screening mammography
+        method: The method to remove white bands
+
+        returns: Image with horizontal white bands removed
+        """
+        # Get horizontal lines in mammography
+        _, lines = self.get_horizontal_lines(
+            image,
+            LMIN=LMIN,
+            LMAX=LMAX,
+            minLineLength=minLineLength,
+            maxLineGap=maxLineGap,
+            alpha=alpha,
+            threshold=self.houghlineP_threshold,
+        )
+        if lines:
+            # Restore image by handling horiztontal white bands
+            List_images = self.split_images_lines(image, lines)
+            image_restored = self.restore_image(
+                image,
+                List_images,
+                lines,
+                method=method,
+                shape=image.shape[0],
+            )
+        else:
+            image_restored = image
+        return image_restored
 
     @staticmethod
-    def _to_gray(image, method_to_gray: str = None) -> np.array:
+    def _to_gray(image, method_to_gray: str = "default") -> np.array:
         """
         Convert mammography sceening to gray
 
@@ -49,7 +214,7 @@ class PreProcessingPipeline:
 
         returns: The image in grayscale
         """
-        if not method_to_gray:
+        if method_to_gray == "default":
             if len(image.shape) == 3:
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         return image
@@ -118,6 +283,7 @@ class PreProcessingPipeline:
         minLineLength: int = 100,
         maxLineGap: int = 20,
         alpha: float = 0.1,
+        threshold: int = 50,
     ):
         """
         Draw and return horizontal lines if they exist (on some screenings). Segments are extended to lines
@@ -135,9 +301,9 @@ class PreProcessingPipeline:
         edges = cv2.Canny(image, LMIN, LMAX)
         lines = cv2.HoughLinesP(
             edges,
-            1,
-            np.pi / 180,
-            50,
+            rho=1,  # Resolution of 1 pixel
+            theta=np.pi / 180,  # Resolution of 1 degre
+            threshold=threshold,
             minLineLength=minLineLength,
             maxLineGap=maxLineGap,
         )
@@ -208,7 +374,7 @@ class PreProcessingPipeline:
         shape: int = 512,
     ):
         """
-        Reconstruct image with horizontal white lines
+        Very experimetal, Reconstruct image with horizontal lines
 
         image: The screening mammography
         list_images: List of splited images according to horizontal lines
@@ -253,8 +419,8 @@ class PreProcessingPipeline:
     def normalize(
         image: np.array,
         method: str = "clahe",
-        clipLimit: float = 2.0,
-        tileGridSize: tuple = (8, 8),
+        clahe_clipLimit: float = 2.0,
+        clahe_tileGridSize: tuple = (8, 8),
     ):
         """
         Normalize image's histogram
@@ -269,50 +435,52 @@ class PreProcessingPipeline:
         if method == "global":
             image = cv2.equalizeHist(image)
         elif method == "clahe":
-            clahe = cv2.createCLAHE(clipLimit=clipLimit, tileGridSize=tileGridSize)
+            clahe = cv2.createCLAHE(
+                clipLimit=clahe_clipLimit, tileGridSize=clahe_tileGridSize
+            )
             image = clahe.apply(image)
         return image
 
-    def _remove_annotation(self, image: np.array):
+    @staticmethod
+    def invert_image(image: np.array):
         """
-        Remove annotation in image
+        Invert image
+        image: The screening mammography
+        returns: Inverted image
+        """
+        return cv2.bitwise_not(image)
+
+    @staticmethod
+    def denoise(
+        image: np.array,
+        method: str = "NlMD",
+        h: float = 3,
+        block_size: int = 7,
+        search_window: int = 21,
+    ):
+        """
+        Denoise image
 
         image: The screening mammography
+        method: Method for denoising (by default, non local means denoising)
+        TODO: implement other methods of denoising
 
-        returns: Image without annotation
+        returns: Denoised image
         """
-        contours = self.get_contours(image)
-        mask = self.draw_contours(contours, image, biggest=True)[1]
-        return cv2.bitwise_and(image, mask)
+        if method == "NlMD":
+            return cv2.fastNlMeansDenoising(image, None, h, block_size, search_window)
 
-    def _remove_line(self, image: np.array, method: str = "delete"):
-        _, lines = self.get_horizontal_lines(image)
-        List_images = self.split_images_lines(image, lines)
-        image_restored = self.restore_image(image, List_images, lines, method=method)
-        return image_restored
+    @staticmethod
+    def gamma_correct(image: np.array, gamma: float = 2.2):
+        """
+        Gamma correct image
 
-    def pre_process(self, images: np.array or List[np.array]):
-        if isinstance(images, np.array):
-            images = [images]
-        for image in images:
-            image = self._to_gray(image, method_to_gray=self.method_to_gray)
-            if self.remove_annotation:
-                image = self._remove_annotation(image)
-            if self.remove_line:
-                image = self._remove_line(image, method=self.remove_line)
-                pass
-            if self.normalization:
-                image = self.normalize(image, method=self.normalization)
-            if self.denoising:
-                # TODO #image = self.
-                pass
-            if self.gamma_correction:
-                # TODO #image = self.
-                pass
-            if self.background_uniformity:
-                # TODO #image = self.
-                pass
-            if self.sharpening:
-                # TODO #image = self.
-                pass
-        return image
+        image: The screening mammography
+        gamma: The factor to use to gamma correct image
+
+        returns: Gamma corrected image
+        """
+        lut = np.array(
+            [((i / 255.0) ** (1.0 / gamma)) * 255 for i in np.arange(0, 256)]
+        ).astype("uint8")
+        return cv2.LUT(image, lut)

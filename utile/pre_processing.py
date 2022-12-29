@@ -14,6 +14,7 @@ class PreProcessingPipeline:
         sharpening: bool = False,
         gamma_correction: bool = False,
         inverted_image: bool = False,
+        pectoral_muscle: bool = True,
         **methods_args,
     ) -> None:
         """
@@ -38,12 +39,14 @@ class PreProcessingPipeline:
         self.sharpening = sharpening
         self.gamma_correction = gamma_correction
         self.inverted_image = inverted_image
+        self.pectoral_muscle = pectoral_muscle
 
         # Default values for preprocessing that you can change in calling the constructor of the Pipeline class
         # Methods to adopt in the pipeline for each step
         self.denoising_method = "NlMD"
         self.normalization_method = "clahe"
         self.remove_line_method = "delete"
+        self.pectoral_muscle_method = "prewitt"
 
         # Arguments about contours detection
         self.contours_low = 5
@@ -69,6 +72,11 @@ class PreProcessingPipeline:
         self.denoise_block_size = 7
         self.denoise_search_window = 21
 
+        # Arguments for pectoral muscle removal
+        self.pectoral_muscle_kernel_size_closing = (5, 5)
+        self.pectoral_muscle_thresh_mask_edges = 0.95
+        self.pectoral_muscle_kernel_erosion_shape = (1, 2)
+
         # Possibilty to adjust parameters
         self.__dict__.update(methods_args)
 
@@ -87,7 +95,23 @@ class PreProcessingPipeline:
 
         # Apply pre-processing for each image
         for i, image in enumerate(images):
+
+            # Convert image to gray
             image = self._to_gray(image, method_to_gray=self.method_to_gray)
+            shape = image.shape
+            # This part is to remove small black bands at top and bottom of image
+
+            contours = self.get_contours(
+                image, thresh_low=self.contours_low, thresh_high=self.contours_high
+            )
+            biggest_contour = max(contours, key=cv2.contourArea)
+            # Apply mask on biggest contour
+            mask = self.draw_contours(contours, image, biggest=True)[1]
+            # Remove small spaces at the top and bottom of image
+            _, y, _, h = cv2.boundingRect(biggest_contour)
+            image = image[y + 2 : y + h, :]
+            # Resize image to correct shape
+            image = cv2.resize(image, shape)
 
             if self.remove_annotation:
                 image, mask = self._remove_annotation(
@@ -131,7 +155,14 @@ class PreProcessingPipeline:
             if self.sharpening:
                 # TODO #image = self.
                 pass
-
+            if self.pectoral_muscle:
+                image = self._remove_pectoral_muscle(
+                    image,
+                    method=self.pectoral_muscle_method,
+                    kernel_size_closing=self.pectoral_muscle_kernel_size_closing,
+                    thresh_mask_edges=self.pectoral_muscle_thresh_mask_edges,
+                    kernel_erosion_shape=self.pectoral_muscle_kernel_erosion_shape,
+                )
             image = cv2.bitwise_and(image, mask)
 
             if self.inverted_image:
@@ -154,10 +185,19 @@ class PreProcessingPipeline:
 
         returns: Image without annotation
         """
+        shape = image.shape
+        # Get contours
         contours = self.get_contours(
             image, thresh_low=thresh_low, thresh_high=thresh_high
         )
+        biggest_contour = max(contours, key=cv2.contourArea)
+        # Apply mask on biggest contour
         mask = self.draw_contours(contours, image, biggest=True)[1]
+        # # Remove small spaces at the top and bottom of image
+        # _, y, _, h = cv2.boundingRect(biggest_contour)
+        # image = image[y + 50 : y + h, :]
+        # # Resize image to correct shape
+        # image = cv2.resize(image, shape)
         return cv2.bitwise_and(image, mask), mask
 
     def _remove_line(
@@ -201,6 +241,151 @@ class PreProcessingPipeline:
         else:
             image_restored = image
         return image_restored
+
+    def _remove_pectoral_muscle(
+        self,
+        image: np.array,
+        method: str = "prewitt",
+        kernel_size_closing: tuple = (5, 5),
+        thresh_mask_edges: float = 0.95,
+        kernel_erosion_shape: tuple = (1, 2),
+    ):
+        """
+        Method to remove pectoral muscle (implementation adapted from
+        Removal of pectoral muscle based on topographic map and shape-shifting silhouette)
+
+        image: Screening mammography
+        method: The method for edge detection (here prewitt method is used)
+        kernel_size_closing: Kernel used for closing method (cf. opencv)
+        thresh_mask_edges: Adaptative relative thresholding for mask
+        kernel_erosion_shape: Kernel of the erosion
+
+        returns: Image without pectoral muscle
+        """
+        # Get edges
+        edges = self.get_edges(image=image, method=method)
+        edges = self.remove_useless_edges(
+            edges=edges,
+            kernel_size_closing=kernel_size_closing,
+            thresh_mask_edges=thresh_mask_edges,
+            kernel_erosion_shape=kernel_erosion_shape,
+        )
+        hull = self.get_convex_hull(edges=edges)
+        mask = np.zeros_like(image)
+
+        # Fill the convex hull with 1's in the mask
+        cv2.fillConvexPoly(mask, hull, 1)
+
+        # Apply the binary mask to the image
+        image = cv2.bitwise_and(image, image, mask=mask)
+
+        return image
+
+    @staticmethod
+    def get_edges(image: np.array, method: str = "prewitt") -> np.array:
+        """
+        Detect edges from an image given a method
+
+        image: Screening mammography
+        method: The method for edge detection (here prewitt method is used)
+
+        returns: Edges of the image
+        """
+        edges = []
+        image = image / 255
+        if method == "prewitt":
+            kernelx = np.array([[1, 1, 1], [0, 0, 0], [-1, -1, -1]])
+            kernely = np.array([[-1, 0, 1], [-1, 0, 1], [-1, 0, 1]])
+
+            img_prewittx = cv2.filter2D(image, -1, kernelx)
+            img_prewitty = cv2.filter2D(image, -1, kernely)
+
+            # Calculate the gradient magnitude
+            edges = np.sqrt(np.square(img_prewittx) + np.square(img_prewitty))
+
+            # Normalize the gradient magnitude image
+            edges = cv2.normalize(edges, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1)
+
+        return edges
+
+    @staticmethod
+    def remove_useless_edges(
+        edges: np.array,
+        kernel_size_closing: tuple = (5, 5),
+        thresh_mask_edges: float = 0.95,
+        kernel_erosion_shape: tuple = (1, 2),
+    ):
+        """
+        Remove useless edges by adaptive thresholding and small erosion
+
+        edges: Detected edges from image
+        kernel_size_closing: Kernel used for closing method (cf. opencv)
+        thresh_mask_edges: Adaptative relative thresholding for mask
+        kernel_erosion_shape: Kernel of the erosion
+
+        returns: Filtered edges
+        """
+        # Define the kernel for the closing operation
+        kernel = np.ones(kernel_size_closing, np.uint8)
+
+        # Apply the closing operation to the image
+        closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+
+        intensities = closed.flatten()
+
+        # Create a new array of non-zero intensities
+        intensities = intensities[intensities > 10]
+
+        # Sort the array of pixel intensities
+        intensities.sort()
+
+        # Find the index of the thresh_mask_edges quantile
+        index = int(len(intensities) * thresh_mask_edges)
+
+        # Retrieve the 50th quantile value from the sorted array
+        quantile = intensities[index]
+
+        _, edges_thresh = cv2.threshold(closed, quantile, 255, cv2.THRESH_BINARY)
+
+        # Define the kernel for the erosion operation
+        kernel = np.ones(kernel_erosion_shape, np.uint8)
+
+        # Apply the erosion operation to the image
+        edges_thresh = cv2.erode(edges_thresh, kernel, iterations=1)
+        return edges_thresh
+
+    @staticmethod
+    def get_convex_hull(edges: np.array) -> np.array:
+        """
+        Get convex hull from edges of image
+
+        edges: Detected edges from image
+
+        returns: Minimum convex hull (cf. opencv)
+        """
+        # Find the non-zero pixels in the image
+        points = np.argwhere(edges > 0)
+
+        points = np.array([[elem[1], elem[0]] for elem in points])
+
+        # Calculate the convex hull of the points
+        hull = cv2.convexHull(points)
+        return hull
+
+    @staticmethod
+    def draw_convex_hull(hull: np.array, image: np.array) -> np.array:
+        """
+        Draw convex hull on an image (cf opencv)
+
+        image: The image to convert
+        hull: The hull to be drawn
+
+        returns: The image with drawn hull in red
+        """
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        # Draw the convex hull on the image
+        image = cv2.polylines(image, [hull], True, (255, 0, 0), 2)
+        return image
 
     @staticmethod
     def _to_gray(image, method_to_gray: str = "default") -> np.array:

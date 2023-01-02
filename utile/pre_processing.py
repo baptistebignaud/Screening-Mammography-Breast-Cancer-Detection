@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from typing import List
+from skimage.metrics import structural_similarity
 
 
 class PreProcessingPipeline:
@@ -177,7 +178,7 @@ class PreProcessingPipeline:
 
     def _remove_annotation(
         self, image: np.array, thresh_high: int = 255, thresh_low: int = 5
-    ):
+    ) -> np.array:
         """
         Remove annotation in image
 
@@ -209,7 +210,7 @@ class PreProcessingPipeline:
         maxLineGap,
         alpha,
         method: str = "delete",
-    ):
+    ) -> np.array:
         """
         Very experimetal, remove horizontal white bands in some images
 
@@ -249,7 +250,7 @@ class PreProcessingPipeline:
         kernel_size_closing: tuple = (5, 5),
         thresh_mask_edges: float = 0.95,
         kernel_erosion_shape: tuple = (1, 2),
-    ):
+    ) -> np.array:
         """
         Method to remove pectoral muscle (implementation adapted from
         Removal of pectoral muscle based on topographic map and shape-shifting silhouette)
@@ -314,7 +315,7 @@ class PreProcessingPipeline:
         kernel_size_closing: tuple = (5, 5),
         thresh_mask_edges: float = 0.95,
         kernel_erosion_shape: tuple = (1, 2),
-    ):
+    ) -> np.array:
         """
         Remove useless edges by adaptive thresholding and small erosion
 
@@ -469,7 +470,7 @@ class PreProcessingPipeline:
         maxLineGap: int = 20,
         alpha: float = 0.1,
         threshold: int = 50,
-    ):
+    ) -> tuple:
         """
         Draw and return horizontal lines if they exist (on some screenings). Segments are extended to lines
 
@@ -557,7 +558,7 @@ class PreProcessingPipeline:
         method: str = "delete",
         thresh_low: float = 0.1,
         shape: int = 512,
-    ):
+    ) -> np.array:
         """
         Very experimetal, Reconstruct image with horizontal lines
 
@@ -606,7 +607,7 @@ class PreProcessingPipeline:
         method: str = "clahe",
         clahe_clipLimit: float = 2.0,
         clahe_tileGridSize: tuple = (8, 8),
-    ):
+    ) -> np.array:
         """
         Normalize image's histogram
 
@@ -627,7 +628,7 @@ class PreProcessingPipeline:
         return image
 
     @staticmethod
-    def invert_image(image: np.array):
+    def invert_image(image: np.array) -> np.array:
         """
         Invert image
         image: The screening mammography
@@ -642,7 +643,7 @@ class PreProcessingPipeline:
         h: float = 3,
         block_size: int = 7,
         search_window: int = 21,
-    ):
+    ) -> np.array:
         """
         Denoise image
 
@@ -656,7 +657,7 @@ class PreProcessingPipeline:
             return cv2.fastNlMeansDenoising(image, None, h, block_size, search_window)
 
     @staticmethod
-    def gamma_correct(image: np.array, gamma: float = 2.2):
+    def gamma_correct(image: np.array, gamma: float = 2.2) -> np.array:
         """
         Gamma correct image
 
@@ -669,3 +670,47 @@ class PreProcessingPipeline:
             [((i / 255.0) ** (1.0 / gamma)) * 255 for i in np.arange(0, 256)]
         ).astype("uint8")
         return cv2.LUT(image, lut)
+
+    @staticmethod
+    def evaluate_metrics(
+        raw_imgs: List[np.array] or np.array,
+        pre_processed_imgs: List[np.array] or np.array,
+    ) -> tuple:
+        """
+        Evaluate different metrics for pre_processing
+
+        raw_imgs: Raw image or list of raws images
+        pre_processed_imgs: pre-processed image or list of pre-processed images
+
+        returns: SNR and SSIM between each pair of raw and pre-processed images
+        """
+        snrs = []
+        ssims = []
+
+        if not (isinstance(raw_imgs, type(pre_processed_imgs))):
+            raise Exception("Please provide either two lists of images or two images")
+        if isinstance(raw_imgs, List):
+            if not len(raw_imgs) == len(pre_processed_imgs):
+                raise Exception(
+                    "Please provide the same number of images (one raw image and associated pre-processed image)"
+                )
+        if not isinstance(raw_imgs, List):
+            raw_imgs = [raw_imgs]
+            pre_processed_imgs = [pre_processed_imgs]
+
+        for raw_img, pre_processed_img in zip(raw_imgs, pre_processed_imgs):
+
+            # Calculate the difference image
+            diff = pre_processed_img - raw_img
+
+            # Calculate the mean and standard deviation of the difference image
+            mean = np.mean(diff)
+            std = np.std(diff)
+
+            # Calculate the SNR
+            snr = mean / std
+            snrs.append(snr)
+            (score, _) = structural_similarity(raw_img, pre_processed_img, full=True)
+            ssims.append(score)
+
+        return snrs, ssims

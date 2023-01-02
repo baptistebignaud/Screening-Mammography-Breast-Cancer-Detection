@@ -7,7 +7,6 @@ from typing import List
 from random import sample
 
 # Images librairies
-from PIL import Image
 import cv2
 
 # Plot librairies
@@ -21,68 +20,7 @@ import pandas as pd
 
 # Librairies for basics manipulation on file
 import six
-
-
-def load_file(files: str or List[str] or List[np.array], n: int, m: int = None) -> List:
-    """
-    Construct the file of images to be ploted
-
-    files: The path of the folder in which images are stored or list of paths of images or list of images
-    m: Number of columns for the plot (if needed)
-    n: Number of rows for the plot
-
-    returns: Either list of paths of images or list of images
-    """
-    if isinstance(files, str):
-        # Create a list of the filenames in the folder
-        filenames = os.listdir(files)
-        if m:
-            k = n * m
-        else:
-            k = n
-        sampled_filenames = random.sample(filenames, k)
-    else:
-        sampled_filenames = files
-        if m:
-            if not (n * m >= len(sampled_filenames)):
-                warnings.warn(
-                    "You won't be able to see all images due to lack of rows and columns"
-                )
-    return sampled_filenames
-
-
-def load_image(
-    files: str or List[str] or List[np.array],
-    filename: str or np.array,
-    source: str = "PNG",
-) -> np.array:
-    """
-    Open the image of a given plot
-
-    files: The path of the folder in which images are stored or list of paths of images or list of images
-    filename: Either the path of the image or the image
-    source: The source of image (PNG or DCOM)
-
-    returns: np.array of image to plot at a given place
-    """
-    if source == "PNG":
-        # If only the path is provided
-        if isinstance(files, str):
-            img = Image.open(os.path.join(files, filename))
-
-        # If the list of images' path is provided
-        elif isinstance(files, list) and all(isinstance(i, str) for i in files):
-            img = Image.open(filename)
-
-        # If the list of images is provided
-        else:
-            img = filename
-
-    elif source == "DCOM":
-        # TODO
-        pass
-    img = np.array(img)
-    return img
+from utile.loaders import load_file, load_image
 
 
 def plot_sample(

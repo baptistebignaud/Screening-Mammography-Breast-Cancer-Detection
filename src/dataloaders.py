@@ -84,7 +84,7 @@ def imagenet(datasetName):
     return {"dataloader": dataLoader(pytorchDataset, shuffle = datasetName == "train", episodic=args.episodic and datasetName == "train", datasetName="imagenet_"+datasetName), "name":"imagenet_" + datasetName, "num_classes":1000, "name_classes": pytorchDataset.classes}
 
 def rsna(rsna_name, split, is_train):
-    f = open(args.dataset_path + "datasets.json")    
+    f = open(args.dataset_path + "datasets_rsna.json")    
     all_datasets = json.loads(f.read())
     f.close()
     dataset = all_datasets[rsna_name]
@@ -93,11 +93,11 @@ def rsna(rsna_name, split, is_train):
         image_size = args.training_image_size if args.training_image_size>0 else 224
     else:
         image_size = args.test_image_size if args.test_image_size>0 else 224
-    default_train_transforms = ['randomresizedcrop','randomhorizontalflip', 'totensor', 'imagenetnorm']
+    default_train_transforms = ['resize','randomhorizontalflip', 'colorjitter', 'randomverticalflip', 'totensor']
     if args.sample_aug == 1:
-        default_test_transforms = ['resize_256/224', 'centercrop', 'totensor', 'imagenetnorm']
+        default_test_transforms = ['resize', 'totensor']
     else:
-        default_test_transforms = ['randomresizedcrop', 'totensor', 'imagenetnorm']
+        default_test_transforms = ['randomresizedcrop', 'totensor']
 
     # depeding the split, we need to select the right data
     start, end = split

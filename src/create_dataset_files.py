@@ -40,6 +40,6 @@ if os.path.exists(path):
     all_results['rsna512'] = result
     print("Done for rsna512 with " + str(result["num_classes"]) + " classes and " + str(len(result["data"])) + " samples (" + str(len(result["targets"])) + ")")
 
-f = open(args.dataset_path + "datasets.json", "w")
+f = open(args.dataset_path + "datasets_rsna.json", "w")
 f.write(json.dumps(all_results))
 f.close()

@@ -48,5 +48,25 @@ def updateCSV(stats, epoch = -1):
             text += str(stats[i,0].item()) + ", " + str(stats[i,1].item()) + ", "
         f.write(text)
         f.close()
+def pfbeta(labels, predictions, beta):
+    y_true_count = 0
+    ctp = 0
+    cfp = 0
 
+    for idx in range(len(labels)):
+        prediction = min(max(predictions[idx], 0), 1)
+        if (labels[idx]):
+            y_true_count += 1
+            ctp += prediction
+        else:
+            cfp += prediction
+
+    beta_squared = beta * beta
+    c_precision = ctp / (ctp + cfp)
+    c_recall = ctp / (y_true_count+10e-8)
+    if (c_precision > 0 and c_recall > 0):
+        result = (1 + beta_squared) * (c_precision * c_recall) / (beta_squared * c_precision + c_recall)
+        return result
+    else:
+        return 0
 print(" utils,", end="")

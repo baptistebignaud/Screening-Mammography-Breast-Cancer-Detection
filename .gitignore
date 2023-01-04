@@ -8,3 +8,4 @@ kaggle_dataset
 # Some caches
 .DS_Store
 /utile/__pycache__
+*__pycache__*

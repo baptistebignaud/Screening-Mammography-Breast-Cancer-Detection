@@ -48,7 +48,10 @@ class LR(nn.Module):
         if lr or mixup or manifold_mixup:
             output = self.fc(x)
             decision = output.argmax(dim = 1)
-            score = (decision - y == 0).float().mean()
+            if args.metric == "accuracy":
+                score = (decision - y == 0).float().mean()
+            else:
+                score = (y.cpu(), (decision>=0.5).int().cpu()) # only for lr for now (not mixup)
             loss = self.criterion(output, y)
             multiplier = 0.5
         if lbda is not None:

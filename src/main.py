@@ -77,6 +77,8 @@ def train(epoch, backbone, teacher, criterion, optimizer, scheduler):
                         dataStep = data['supervised'].clone()
                         loss_lr, score = criterion['supervised'][trainingSetIdx](backbone, dataStep, target, lr="lr" in step, rotation="rotations" in step, mixup="mixup" in step, manifold_mixup="manifold mixup" in step)
                         loss += args.step_coefficient[step_idx]*loss_lr
+                        if args.metric != "accuracy":
+                            score = torch.tensor(100*pfbeta(score[0], score[1], 1))
 
                     if 'dino' in step:
                         dataStep = data['dino']
@@ -134,15 +136,29 @@ def test(backbone, datasets, criterion):
     results = []
     for testSetIdx, dataset in enumerate(datasets):
         losses, accuracies, total_elt = 0, 0, 0
+        gts, predictions = [], []
         with torch.no_grad():
             for batchIdx, (data, target) in enumerate(dataset["dataloader"]):
                 data = to(data, args.device)
                 target = target.to(args.device)
                 loss, score = criterion[testSetIdx](backbone, data, target, lr=True)
+
                 losses += data.shape[0] * loss.item()
-                accuracies += data.shape[0] * score.item()
+                if args.metric == 'accuracy':
+                    accuracies += data.shape[0] * score.item()
+                else:
+                    gt, pred = score
+                    gts.append(gt)
+                    predictions.append(pred)
                 total_elt += data.shape[0]
-        results.append((losses / total_elt, 100 * accuracies / total_elt))
+        if args.metric == 'accuracy':
+            accuracies = 100 * accuracies / total_elt
+        else:
+            gts = torch.cat(gts, dim = 0)
+            predictions = torch.cat(predictions, dim = 0)
+            # probabilistic f1 score
+            accuracies = 100*pfbeta(gts, predictions, 1)
+        results.append((losses / total_elt, accuracies))
         if args.wandb!='':
             wandb.log({ "test_loss_{}".format(dataset["name"]) : losses / total_elt, "test_acc_{}".format(dataset["name"]) : accuracies / total_elt})
         display(" " * (1 + max(0, len(datasets[testSetIdx]["name"]) - 16)) + opener + "{:.2e}  {:6.2f}%".format(losses / total_elt, 100 * accuracies / total_elt) + ender, end = '', force = True)

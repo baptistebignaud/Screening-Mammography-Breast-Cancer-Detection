@@ -81,6 +81,7 @@ parser.add_argument("--input-channels", type=int, default=3, help="number of inp
 
 ### criterion
 parser.add_argument("--classifier", type=str, default="lr", help="define which classifier is used on top of selected backbone, can be any of lr for logistic regression, or L2 for euclidean distance regression, or multilabelBCE for multi label classification")
+parser.add_argument("--metric", type=str, default="accuracy", help="define which metric to evaluate on")
 
 ### scheduler parameters
 parser.add_argument("--epochs", type=int, default=350, help="total number of training epochs")

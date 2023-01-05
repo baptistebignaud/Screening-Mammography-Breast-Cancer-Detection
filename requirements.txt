@@ -10,7 +10,7 @@
 ### ML Librairies
     scikit-learn
     mlrose  
-    tensorflow == 2.5.0
+    #tensorflow == 2.5.0
     wandb
 ###Database
     # mysql.connector == 2.2.9
@@ -22,6 +22,6 @@
     tqdm == 4.62.1
 ### Images processing
     opencv-python == 4.5.5.62
-    easyimages==0.8.6
+    scikit-image
 
     

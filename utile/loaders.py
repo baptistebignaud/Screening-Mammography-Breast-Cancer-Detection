@@ -1,3 +1,5 @@
+from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms, utils
 import random
 from typing import List
 import numpy as np
@@ -6,6 +8,10 @@ from PIL import Image
 import os
 import cv2
 import pandas as pd
+import torch
+from utile.pre_processing import PreProcessingPipeline
+from opencv_transforms import transforms
+
 
 img_path = "../kaggle_dataset"
 
@@ -92,3 +98,68 @@ def create_batch(
             axis=1,
         ).tolist()
     return [load_image(img_path, elem) for elem in L_samples]
+
+
+class RNSADataset(Dataset):
+    """
+    RNSA dataset
+    """
+
+    def __init__(
+        self,
+        csv_file,
+        root_dir,
+        transform=None,
+        features=["age", "implant", "machine_id", "laterality", "view"],
+        labels=["cancer", "biopsy", "invasive", "BIRADS", "difficult_negative_case"],
+    ):
+        """
+        Args:
+            csv_file (string): Path to the csv file.
+            root_dir (string): Directory with all the images.
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        df = pd.read_csv(csv_file)
+        df["path"] = df.apply(
+            lambda x: "".join(
+                [root_dir, "/", str(x["patient_id"]), "_", str(x["image_id"]), ".png"]
+            ),
+            axis=1,
+        )
+        self.ohe_columns = pd.get_dummies(
+            df[list(set(features) & set(["machine_id", "laterality", "view"]))],
+            columns=list(set(features) & set(["machine_id", "laterality", "view"])),
+        ).columns
+        df = pd.get_dummies(
+            df,
+            columns=list(set(features) & set(["machine_id", "laterality", "view"])),
+        )
+        self.RNSA_frame = df
+        self.root_dir = root_dir
+        self.transform = transform
+        self.features = features
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.RNSA_frame)
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        img_name = os.path.join(self.root_dir, self.RNSA_frame.iloc[idx]["path"])
+        image = cv2.imread(img_name)
+        features = self.RNSA_frame.iloc[idx][self.ohe_columns].to_numpy()
+
+        # features = features
+
+        labels = self.RNSA_frame.iloc[idx][self.labels].to_numpy()
+        # features = features.reshape(-1, 2)
+        # labels = labels.reshape(-1, 2)
+        sample = {"image": image, "features": features, "labels": labels}
+
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample

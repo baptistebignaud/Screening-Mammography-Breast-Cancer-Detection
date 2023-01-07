@@ -1,10 +1,11 @@
 import cv2
 import numpy as np
 from typing import List
-from skimage.metrics import structural_similarity
+
+# from skimage.metrics import structural_similarity
 
 
-class PreProcessingPipeline:
+class PreProcessingPipeline(object):
     def __init__(
         self,
         method_to_gray: str = "default",
@@ -80,6 +81,13 @@ class PreProcessingPipeline:
 
         # Possibilty to adjust parameters
         self.__dict__.update(methods_args)
+
+    def __call__(self, sample: dict):
+        """
+        Preprocess function for Pytorch pipeline
+        """
+        sample["image"] = self.pre_process(sample["image"])
+        return sample
 
     def pre_process(
         self, images: np.array or List[np.array]
@@ -710,7 +718,10 @@ class PreProcessingPipeline:
             # Calculate the SNR
             snr = mean / std
             snrs.append(snr)
-            (score, _) = structural_similarity(raw_img, pre_processed_img, full=True)
+
+            # TODO handle this, new problem with skimage
+            # (score, _) = structural_similarity(raw_img, pre_processed_img, full=True)
+            score = 0
             ssims.append(score)
 
         return snrs, ssims

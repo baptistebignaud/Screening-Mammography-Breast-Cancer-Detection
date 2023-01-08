@@ -1,10 +1,12 @@
 version: '3.9'
 services:
 
-
    rmbscd:
       tty: true
-      build: .
+      build:
+         context: .
+         shm_size: '12gb'
+      shm_size: '12gb'
       ports:
          - '4000:4000'
          - '8888:8888' #Notebook port
@@ -16,13 +18,12 @@ services:
 
       networks:
          - rmbscd_network
-
       # deploy:
       #    resources:
       #       reservations:
       #          devices:
       #             - capabilities: [gpu]
       #               driver: nvidia
-   
+
 networks:
    rmbscd_network:

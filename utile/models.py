@@ -34,7 +34,9 @@ class CustomEfficientNet(nn.Module):
 
         l_linear = [layer for layer in layers if isinstance(layer, nn.Linear)]
         if not (l_linear[0].weight.shape[1] == 1280):
-            raise Exception("Please custom classification layer with appropriate shape")
+            raise Exception(
+                "Please provide custom classification layer with appropriate shape"
+            )
 
         if l_linear[-1].weight.shape[0] < n_labels:
             warnings.warn(
@@ -94,69 +96,63 @@ def train_model(
 
         # Each epoch has a training and validation phase
 
-        # for phase in ["train", "val"]:
-        #     if phase == "train":
-        #         model.train()  # Set model to training mode
-        #     else:
-        #         model.eval()  # Set model to evaluate mode
+        for phase in ["train", "val"]:
+            if phase == "train":
+                model.train()  # Set model to training mode
+            else:
+                model.eval()  # Set model to evaluate mode
 
-        #     running_loss = 0.0
-        #     running_corrects = 0
+            running_loss = 0.0
+            running_pf1 = 0.0
+            running_corrects = 0
+            phase = "train"
+            # Iterate over data.
+            for ind, elem in enumerate(dataloaders[phase]):
+                print(f"Batch {ind+1} of {len(dataloaders[phase])} batches ", end="\r")
+                inputs = elem["image"]
+                labels = elem["labels"]
 
-        running_loss = 0.0
-        running_pf1 = 0.0
-        running_corrects = 0
-        phase = "train"
-        # Iterate over data.
-        for ind, elem in enumerate(dataloaders):
-            print(f"Batch {ind+1} of {len(dataloaders)} batches ", end="\r")
-            inputs = elem["image"]
-            labels = elem["labels"]
+                inputs = inputs.to(device)
+                labels = labels.to(device)
 
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+                # zero the parameter gradients
+                optimizer.zero_grad()
 
-            # zero the parameter gradients
-            optimizer.zero_grad()
+                # forward
+                # track history if only in train
+                with torch.set_grad_enabled(phase == "train"):
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
 
-            # forward
-            # track history if only in train
-            with torch.set_grad_enabled(phase == "train"):
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
+                    _, preds = torch.max(outputs, 1)
 
-                _, preds = torch.max(outputs, 1)
+                    # backward + optimize only if in training phase
+                    if phase == "train":
+                        loss.backward()
+                        optimizer.step()
 
-                # backward + optimize only if in training phase
-                if phase == "train":
-                    loss.backward()
-                    optimizer.step()
+                # statistics
+                running_loss += loss.item() * inputs.size(0)
+                running_corrects += torch.sum(preds == labels.data)
+                running_pf1 += pfbeta(labels, outputs) * inputs.size(0)
 
-            # statistics
-            running_loss += loss.item() * inputs.size(0)
-            running_corrects += torch.sum(preds == labels.data)
-            running_pf1 += pfbeta(labels, outputs) * inputs.size(0)
+            epoch_loss = running_loss / len(dataloaders[phase].dataset)
+            epoch_pf1 = running_pf1 / len(dataloaders[phase].dataset)
+            try:
+                epoch_pf1 = epoch_pf1.item()
+            except:
+                pass
 
-        # epoch_loss = running_loss / len(dataloaders[phase].dataset)
-        epoch_loss = running_loss / len(dataloaders.dataset)
+            print("{} Loss: {:.4f} pf1: {:.4f}".format(phase, epoch_loss, epoch_pf1))
 
-        # epoch_pf1 = running_corrects.double() / len(dataloaders[phase].dataset)
-        epoch_pf1 = running_pf1 / len(dataloaders.dataset)
-        try:
-            epoch_pf1 = epoch_pf1.item()
-        except:
-            pass
+            # deep copy the model
+            if phase == "val" and epoch_pf1 > best_pf1:
+                best_pf1 = epoch_pf1
+                best_model_wts = copy.deepcopy(model.state_dict())
+            if phase == "val":
+                val_pf1_history.append(epoch_pf1)
 
-        print("{} Loss: {:.4f} pf1: {:.4f}".format(phase, epoch_loss, epoch_pf1))
-
-        # deep copy the model
-        if phase == "val" and epoch_pf1 > best_pf1:
-            best_pf1 = epoch_pf1
-            best_model_wts = copy.deepcopy(model.state_dict())
-        if phase == "val":
-            val_pf1_history.append(epoch_pf1)
-
-        print()
+            print()
 
     time_elapsed = time.time() - since
     print(

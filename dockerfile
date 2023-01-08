@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
     python3.8-dev\
     unixodbc-dev\
     build-essential\
-    python-sqlalchemy\
     graphviz\
     ffmpeg libsm6 libxext6\
     # Change default python
@@ -36,6 +35,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends --no-install-su
 RUN curl -fsSL --silent https://deb.nodesource.com/setup_14.x |  bash 
 RUN apt-get install nodejs -y
 #RUN apt-get install npm -y
+#RUN pip3 install --force-reinstall torch torchvision torchaudio
+
+# next line cf. https://forums.developer.nvidia.com/t/what-is-cannot-allocate-memory-in-static-tls-block/169225
+RUN export LD_PRELOAD=/usr/local/lib/python3.8/dist-packages/torch/lib/libgomp-d22c30c5.so.1
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --upgrade pip

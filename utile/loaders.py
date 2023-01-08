@@ -111,7 +111,8 @@ class RNSADataset(Dataset):
         root_dir,
         transform=None,
         features=["age", "implant", "machine_id", "laterality", "view"],
-        labels=["cancer", "biopsy", "invasive", "BIRADS", "difficult_negative_case"],
+        labels=["cancer"]
+        # , "biopsy", "invasive", "BIRADS", "difficult_negative_case"],
     ):
         """
         Args:
@@ -161,5 +162,4 @@ class RNSADataset(Dataset):
 
         if self.transform:
             sample = self.transform(sample)
-
         return sample

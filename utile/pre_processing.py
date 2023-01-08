@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from typing import List
+import torch
 
 # from skimage.metrics import structural_similarity
 
@@ -86,7 +87,16 @@ class PreProcessingPipeline(object):
         """
         Preprocess function for Pytorch pipeline
         """
-        sample["image"] = self.pre_process(sample["image"])
+        sample["image"] = torch.tensor(
+            np.reshape(
+                np.array(self.pre_process(sample["image"]), dtype=np.float32),
+                (1, sample["image"].shape[0], sample["image"].shape[1]),
+            )
+        )
+        sample["features"] = torch.tensor(
+            np.array(sample["features"], dtype=np.float32)
+        )
+        sample["labels"] = torch.tensor(np.array(sample["labels"], dtype=np.float32))
         return sample
 
     def pre_process(

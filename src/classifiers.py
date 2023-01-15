@@ -18,6 +18,7 @@ class LR(nn.Module):
         self.fc = nn.Linear(inputDim, numClasses)
         self.fcRotations = nn.Linear(inputDim, 4)
         self.criterion = nn.CrossEntropyLoss() if args.label_smoothing == 0 else LabelSmoothingLoss(numClasses, args.label_smoothing)
+        self.supervised_criterion = nn.CrossEntropyLoss(weight=torch.tensor([1., args.pos_weight_loss]))  #nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1., args.pos_weight_loss])) # weight pos class 
         self.backbone = backbone
     def forward(self, backbone, dataStep, y, lr=False, rotation=False, mixup=False, manifold_mixup=False):
         lbda, perm, mixupType = None, None, None
@@ -52,7 +53,7 @@ class LR(nn.Module):
                 score = (decision - y == 0).float().mean()
             else:
                 score = (y.cpu(), (decision>=0.5).int().cpu()) # only for lr for now (not mixup)
-            loss = self.criterion(output, y)
+            loss = self.supervised_criterion(output, y)
             multiplier = 0.5
         if lbda is not None:
             loss = lbda * loss + (1 - lbda) * self.criterion(output, y[perm])

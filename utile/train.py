@@ -125,14 +125,15 @@ def train_model(
                         running_pf1 += pfbeta(labels, outputs) * inputs.size(0)
                     try:
                         running_pf1 = running_pf1.item()
+                        pf1 = pfbeta(labels, outputs).item()
                     except:
-                        pass
+                        pf1 = pfbeta(labels, outputs)
                     # running_pf1 /= args.batch_size
 
                     # Display information of training
                     tepoch.set_postfix(
                         loss=loss.item(),
-                        pf1=pfbeta(labels, outputs),
+                        pf1=pf1,
                         batch=f"{ind+1}/{len(dataloaders[phase])}",
                     )
                     sleep(0.1)

@@ -87,6 +87,10 @@ Be carefull, the repository is built to give the possibility to use a GPU. If yo
 > `kill -9 <PID>` <br>
 With PID being the process ID of python (for notebook)
 
+## Run training model
+
+> `python3 train.py --images_dir "../kaggle_dataset" --csv_file_path "../data/train.csv" --model "EfficientNet" --num_epochs 1`
+
 # References
 
 TODO

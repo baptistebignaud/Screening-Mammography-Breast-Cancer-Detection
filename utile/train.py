@@ -1,25 +1,57 @@
 import sys
-
-sys.path.insert(0, "/appli")
-from utile.parser import parser
-import torch
-from torch.nn import BCELoss, MSELoss
-from torch import optim
-import pandas as pd
-from utile.models import CustomEfficientNet
-from torch import nn
+import os
 import time
+from time import sleep
 import copy
 import warnings
-from utile.loaders import load_file, load_image, create_batch, RNSADataset
-from opencv_transforms import transforms
-from utile.pre_processing import PreProcessingPipeline
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
-from time import sleep
 import random
+
+sys.path.insert(0, "/appli")
+
+import pandas as pd
+from tqdm import tqdm
 import numpy as np
+
+import torch
+from torch import nn, optim
+from torch.nn import MSELoss
+from sklearn.model_selection import StratifiedKFold
+from torch.utils.data import Subset
+
+from utile.parser import parser
+from utile.models import CustomEfficientNet
+from utile.loaders import RNSADataset
+from utile.pre_processing import PreProcessingPipeline
+from torch.utils.data import DataLoader
+
+from opencv_transforms import transforms
+
 import wandb
+
+
+# cf. https://discuss.pytorch.org/t/how-to-enable-the-dataloader-to-sample-from-each-class-with-equal-probability/911/7 answer of Reuben Feinman
+class StratifiedBatchSampler:
+    """Stratified batch sampling
+    Provides equal representation of target classes in each batch
+    """
+
+    def __init__(self, y, batch_size, shuffle=True):
+        assert len(y.shape) == 1, "label array must be 1D"
+        n_batches = int(len(y) / batch_size)
+        self.batch_size = batch_size
+        self.skf = StratifiedKFold(n_splits=n_batches, shuffle=shuffle)
+        self.X = torch.randn(len(y), 1).numpy()
+        self.y = y
+        self.shuffle = shuffle
+
+    def __iter__(self):
+        if self.shuffle:
+            torch.randint(0, int(1e8), size=()).item()
+        for _, indices in self.skf.split(self.X, self.y):
+            yield indices
+
+    def __len__(self):
+        return len(self.y) // self.batch_size
 
 
 class CustomBCELoss(torch.nn.Module):
@@ -43,9 +75,9 @@ def train_model(
     criterion: torch.nn.modules.loss,
     optimizer: torch.optim,
     num_epochs: int = 15,
-    batch_size: int = 16,
     include_features: bool = False,
-    wandb: bool = False,
+    include_wandb: bool = False,
+    device: str = "cpu",
 ) -> tuple:
     """
     Function to train models and keeps track of training
@@ -58,9 +90,9 @@ def train_model(
     returns: The best model with history of val pf1
     """
     since = time.time()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     val_pf1_history = []
-
+    if device == "cuda":
+        device = torch.device("cuda")
     best_model_wts = copy.deepcopy(model.state_dict())
     best_pf1 = 0.0
     for epoch in range(num_epochs):
@@ -80,7 +112,6 @@ def train_model(
             running_corrects = 0
             phase = "train"
             # Iterate over data.
-
             with tqdm(enumerate(dataloaders[phase])) as tepoch:
                 for ind, elem in tepoch:
                     tepoch.set_description(f"Epoch {epoch+1}/{num_epochs}")
@@ -140,10 +171,7 @@ def train_model(
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_pf1 = running_pf1 / len(dataloaders[phase].dataset)
-            if wandb:
-                wandb.log(
-                    {"phase": phase, "loss": epoch_loss, "pf1": epoch_pf1}, step=epoch
-                )
+
             try:
                 epoch_pf1 = epoch_pf1.item()
             except:
@@ -153,14 +181,23 @@ def train_model(
                 f"Epoch {epoch} for {phase}: \t Loss: {epoch_loss:.4f}, pf1: {epoch_pf1:.4f}"
             )
 
-            # deep copy the model
             if phase == "val" and epoch_pf1 > best_pf1:
+                if include_wandb:
+                    torch.save(
+                        {
+                            "epoch": epoch,
+                            "model_state_dict": model.state_dict(),
+                            "optimizer_state_dict": optimizer.state_dict(),
+                            "loss": epoch_loss,
+                        },
+                        os.path.join(
+                            wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"
+                        ),
+                    )
                 best_pf1 = epoch_pf1
                 best_model_wts = copy.deepcopy(model.state_dict())
             if phase == "val":
                 val_pf1_history.append(epoch_pf1)
-
-            print()
 
     time_elapsed = time.time() - since
     print(
@@ -214,11 +251,12 @@ if __name__ == "__main__":
 
     # Avoid useless warnings
     warnings.filterwarnings("ignore")
-
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     # Define the arguments' parser for training function
     args = parser.parse_args()
-    wandb.login()
-    wandb.init(project="Kaggle_ RSNA", entity="turboteam")
+    if args.wandb:
+        wandb.login()
+        wandb.init(project="Kaggle_ RSNA", entity="turboteam")
 
     g = torch.Generator()
     if args.seed:
@@ -262,7 +300,6 @@ if __name__ == "__main__":
     elif args.model == "ViT":
         pass
         # TODO
-
     # Define loss
     # TODO adapt loss if there are several labels
     if args.loss == "BCE":
@@ -277,37 +314,95 @@ if __name__ == "__main__":
 
     # Define optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    runs = wandb.Api().runs()
+    if args.wandb:
+        runs = wandb.Api().runs()
     try:
         num_runs = len(runs)
     except:
         num_runs = 0
-    wandb.run.name = f"Run {num_runs+1} with model {args.model}"
-    wandb.watch(model, log_freq=100)
-    wandb.config = args
-    # Define training and validation sets
-    train_size = int((1 - args.validation_split) * len(transformed_dataset))
-    validation_size = len(transformed_dataset) - train_size
-    final_dataset = {}
-    final_dataset["train"], final_dataset["validation"] = torch.utils.data.random_split(
-        transformed_dataset, [train_size, validation_size], generator=g
-    )
+    if args.wandb:
+        wandb.run.name = f"Run {num_runs+1} with model {args.model}"
+        wandb.watch(model, log_freq=100)
+        wandb.config = args
 
-    # Define dataloader for training and validation sets
-    dataloader = {}
-    dataloader["train"] = DataLoader(
-        final_dataset["train"], batch_size=args.batch_size, shuffle=True, num_workers=4
-    )
-    dataloader["validation"] = DataLoader(
-        final_dataset["train"], batch_size=args.batch_size, shuffle=True, num_workers=4
-    )
+    # If stratified sampling (to have the same ratio for classes between each batch)
+    if args.stratified_sampling:
 
+        # Creating data indices for training and validation splits:
+        dataset_size = len(transformed_dataset)
+        indices = list(range(dataset_size))
+        split = int(np.floor(args.validation_split * dataset_size))
+        np.random.shuffle(indices)
+        train_indices, val_indices = np.array(indices[split:]), np.array(
+            indices[:split]
+        )
+
+        # Set stratified samplers
+        train_sampler = StratifiedBatchSampler(
+            train_df["cancer"].iloc[train_indices],
+            args.batch_size,
+        )
+        valid_sampler = StratifiedBatchSampler(
+            train_df["cancer"].iloc[val_indices],
+            args.batch_size,
+        )
+
+        # Define datasets
+        final_dataset = {}
+        final_dataset["train"] = Subset(transformed_dataset, train_indices)
+        final_dataset["validation"] = Subset(transformed_dataset, val_indices)
+
+        # Define dataloaders
+        dataloader = {}
+        dataloader["train"] = DataLoader(
+            final_dataset["train"],
+            num_workers=8,
+            batch_sampler=train_sampler,
+        )
+        dataloader["validation"] = DataLoader(
+            final_dataset["train"],
+            num_workers=8,
+            sampler=valid_sampler,
+        )
+
+    # If not stratified sampling
+    else:
+        # Define training and validation sets
+        train_size = int((1 - args.validation_split) * len(transformed_dataset))
+        validation_size = len(transformed_dataset) - train_size
+
+        # Define dataset
+        final_dataset = {}
+        (
+            final_dataset["train"],
+            final_dataset["validation"],
+        ) = torch.utils.data.random_split(
+            transformed_dataset, [train_size, validation_size], generator=g
+        )
+
+        # Define dataloaders
+        dataloader = {}
+        dataloader["train"] = DataLoader(
+            final_dataset["train"],
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=8,
+        )
+        dataloader["validation"] = DataLoader(
+            final_dataset["train"],
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=8,
+        )
+    if device == "cuda":
+        model.to(torch.device("cuda"))
     train_model(
         model=model,
         dataloaders=dataloader,
         criterion=loss,
         optimizer=optimizer,
         num_epochs=args.num_epochs,
-        batch_size=args.batch_size,
         include_features=args.include_features,
+        include_wandb=args.wandb,
+        device=device,
     )

@@ -106,3 +106,24 @@ parser.add_argument(
     default=True,
     help="If features need to be included as prior in the models",
 )
+
+parser.add_argument(
+    "--wandb",
+    type=bool,
+    default=False,
+    help="If wandb need to be set up to save models",
+)
+
+parser.add_argument(
+    "--stratified_sampling",
+    type=bool,
+    default=True,
+    help="If stratified sampling needs to be used for data generator",
+)
+
+parser.add_argument(
+    "--num_workers",
+    type=int,
+    default=8,
+    help="Number of available workers for dataloader",
+)

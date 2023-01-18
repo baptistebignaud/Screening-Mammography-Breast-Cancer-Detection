@@ -38,7 +38,8 @@ RUN apt-get install nodejs -y
 #RUN pip3 install --force-reinstall torch torchvision torchaudio
 
 # next line cf. https://forums.developer.nvidia.com/t/what-is-cannot-allocate-memory-in-static-tls-block/169225
-RUN export LD_PRELOAD=/usr/local/lib/python3.8/dist-packages/torch/lib/libgomp-d22c30c5.so.1
+# RUN export LD_PRELOAD=/usr/local/lib/python3.8/dist-packages/torch/lib/libgomp-d22c30c5.so.1
+# RUN export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libgomp.so.1
 
 COPY requirements.txt requirements.txt
 RUN pip3 install --upgrade pip

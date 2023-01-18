@@ -18,12 +18,14 @@ services:
 
       networks:
          - rmbscd_network
-      # deploy:
-      #    resources:
-      #       reservations:
-      #          devices:
-      #             - capabilities: [gpu]
-      #               driver: nvidia
+      environment:
+         LD_PRELOAD: /usr/lib/aarch64-linux-gnu/libgomp.so.1
+         # deploy:
+         #    resources:
+         #       reservations:
+         #          devices:
+         #             - capabilities: [gpu]
+         #               driver: nvidia
 
 networks:
    rmbscd_network:

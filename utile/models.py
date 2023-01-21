@@ -9,6 +9,7 @@ class CustomEfficientNet(nn.Module):
     def __init__(
         self,
         n_labels: int,
+        device: str = "cpu",
         features: bool = False,
         layers: List = [
             nn.Linear(in_features=1024, out_features=512, bias=True),
@@ -35,6 +36,7 @@ class CustomEfficientNet(nn.Module):
         """
         super().__init__()
         self.features = features
+        self.device = device
 
         l_linear = [layer for layer in layers if isinstance(layer, nn.Linear)]
         # if not (l_linear[0].weight.shape[1] == 1280):
@@ -71,9 +73,11 @@ class CustomEfficientNet(nn.Module):
     def forward(self, x):
         if self.features:
             im = self.network(x["image"])
-            out = torch.cat((im, x["features"]), dim=1)
+            out = torch.cat((im, x["features"]), dim=1).to(self.device)
         else:
             out = self.network(x)
-        out = nn.Linear(out.shape[1], self.classifier[0].weight.shape[1])(out)
+        out = nn.Linear(out.shape[1], self.classifier[0].weight.shape[1]).to(
+            self.device
+        )(out)
         out = self.classifier(out)
         return out

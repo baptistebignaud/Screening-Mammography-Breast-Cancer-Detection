@@ -93,6 +93,7 @@ def train_model(
     val_pf1_history = []
     if device == "cuda":
         device = torch.device("cuda")
+
     best_model_wts = copy.deepcopy(model.state_dict())
     best_pf1 = 0.0
     for epoch in range(num_epochs):
@@ -252,6 +253,8 @@ if __name__ == "__main__":
     # Avoid useless warnings
     warnings.filterwarnings("ignore")
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    if device == "cuda":
+        device = torch.device("cuda")
     # Define the arguments' parser for training function
     args = parser.parse_args()
     if args.wandb:
@@ -264,7 +267,7 @@ if __name__ == "__main__":
         random.seed(args.seed)
         np.random.seed(args.seed)
         g.manual_seed(args.seed)
-        torch.use_deterministic_algorithms(True)
+        # torch.use_deterministic_algorithms(True)
 
     # Define number of labels for prediction
     n_labels = len(args.labels)
@@ -288,11 +291,13 @@ if __name__ == "__main__":
                 n_labels=n_labels,
                 layers=args.layers,
                 features=args.include_features,
+                device=device,
             )
         else:
             model = CustomEfficientNet(
                 n_labels=n_labels,
                 features=args.include_features,
+                device=device,
             )
     elif args.model == "ResNet":
         pass
@@ -303,7 +308,8 @@ if __name__ == "__main__":
     # Define loss
     # TODO adapt loss if there are several labels
     if args.loss == "BCE":
-        weight_fn = lambda x: x * args.BCE_weights + (1 - x)
+        # weight_fn = lambda x: x * args.BCE_weights + (1 - x)
+        weight_fn = lambda x: x + (1 - x) * args.BCE_weights
         loss = CustomBCELoss(weight_fn=weight_fn)
         # loss = BCELoss()
     elif args.loss == "MSE":
@@ -311,7 +317,7 @@ if __name__ == "__main__":
     elif args.loss == "Custom":
         pass
         # TODO
-
+    model.to(device)
     # Define optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     if args.wandb:
@@ -394,8 +400,8 @@ if __name__ == "__main__":
             shuffle=False,
             num_workers=8,
         )
-    if device == "cuda":
-        model.to(torch.device("cuda"))
+    # if device == "cuda":
+    #     model.to(torch.device("cuda"))
     train_model(
         model=model,
         dataloaders=dataloader,

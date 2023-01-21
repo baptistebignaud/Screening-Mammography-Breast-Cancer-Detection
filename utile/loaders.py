@@ -9,7 +9,7 @@ import os
 import cv2
 import pandas as pd
 import torch
-from utile.pre_processing import PreProcessingPipeline
+from pre_processing import PreProcessingPipeline
 from opencv_transforms import transforms
 
 

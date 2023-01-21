@@ -49,6 +49,9 @@ def updateCSV(stats, epoch = -1):
         f.write(text)
         f.close()
 def pfbeta(labels, predictions, beta):
+    """
+    Probabilistic F-beta score
+    """
     y_true_count = 0
     ctp = 0
     cfp = 0

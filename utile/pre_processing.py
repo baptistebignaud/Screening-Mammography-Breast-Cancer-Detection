@@ -117,6 +117,8 @@ class PreProcessingPipeline(object):
 
             # Convert image to gray
             image = self._to_gray(image, method_to_gray=self.method_to_gray)
+            #print('image.shape:', image.shape)
+            #image = cv2.resize(image, (224, 224))
             shape = image.shape
             # This part is to remove small black bands at top and bottom of image
 

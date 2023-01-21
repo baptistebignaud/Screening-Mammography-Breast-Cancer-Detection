@@ -102,22 +102,19 @@ parser.add_argument(
 
 parser.add_argument(
     "--include_features",
-    type=bool,
-    default=True,
+    action="store_true",
     help="If features need to be included as prior in the models",
 )
 
 parser.add_argument(
     "--wandb",
-    type=bool,
-    default=False,
+    action="store_true",
     help="If wandb need to be set up to save models",
 )
 
 parser.add_argument(
     "--stratified_sampling",
-    type=bool,
-    default=True,
+    action="store_true",
     help="If stratified sampling needs to be used for data generator",
 )
 

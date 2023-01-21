@@ -6,7 +6,7 @@ import copy
 import warnings
 import random
 
-sys.path.insert(0, "/appli")
+#sys.path.insert(0, "/appli")
 
 import pandas as pd
 from tqdm import tqdm
@@ -18,10 +18,10 @@ from torch.nn import MSELoss
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset
 
-from utile.parser import parser
-from utile.models import CustomEfficientNet
-from utile.loaders import RNSADataset
-from utile.pre_processing import PreProcessingPipeline
+from parser import parser
+from models import CustomEfficientNet
+from loaders import RNSADataset
+from pre_processing import PreProcessingPipeline
 from torch.utils.data import DataLoader
 
 from opencv_transforms import transforms

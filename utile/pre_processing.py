@@ -353,7 +353,7 @@ class PreProcessingPipeline(object):
         intensities = closed.flatten()
 
         # Create a new array of non-zero intensities
-        intensities = intensities[intensities > 10]
+        intensities = intensities[intensities > 2]
 
         # Sort the array of pixel intensities
         intensities.sort()
@@ -361,8 +361,11 @@ class PreProcessingPipeline(object):
         # Find the index of the thresh_mask_edges quantile
         index = int(len(intensities) * thresh_mask_edges)
 
-        # Retrieve the 50th quantile value from the sorted array
-        quantile = intensities[index]
+        if index == 0:
+            quantile = 0
+        else:
+            # Retrieve the 50th quantile value from the sorted array
+            quantile = intensities[index]
 
         _, edges_thresh = cv2.threshold(closed, quantile, 255, cv2.THRESH_BINARY)
 

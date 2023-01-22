@@ -117,8 +117,8 @@ class PreProcessingPipeline(object):
 
             # Convert image to gray
             image = self._to_gray(image, method_to_gray=self.method_to_gray)
-            #print('image.shape:', image.shape)
-            #image = cv2.resize(image, (224, 224))
+            # print('image.shape:', image.shape)
+            # image = cv2.resize(image, (224, 224))
             shape = image.shape
             # This part is to remove small black bands at top and bottom of image
 
@@ -292,6 +292,8 @@ class PreProcessingPipeline(object):
             kernel_erosion_shape=kernel_erosion_shape,
         )
         hull = self.get_convex_hull(edges=edges)
+        if not hull:
+            return image
         mask = np.zeros_like(image)
 
         # Fill the convex hull with 1's in the mask
@@ -364,7 +366,7 @@ class PreProcessingPipeline(object):
         index = int(len(intensities) * thresh_mask_edges)
 
         if index == 0:
-            quantile = 0
+            return None
         else:
             # Retrieve the 50th quantile value from the sorted array
             quantile = intensities[index]
@@ -387,6 +389,9 @@ class PreProcessingPipeline(object):
 
         returns: Minimum convex hull (cf. opencv)
         """
+        # If the image is fully black
+        if not edges:
+            return None
         # Find the non-zero pixels in the image
         points = np.argwhere(edges > 0)
 

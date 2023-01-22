@@ -6,7 +6,7 @@ import copy
 import warnings
 import random
 
-#sys.path.insert(0, "/appli")
+# sys.path.insert(0, "/appli")
 
 import pandas as pd
 from tqdm import tqdm
@@ -320,14 +320,16 @@ if __name__ == "__main__":
     model.to(device)
     # Define optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # if args.wandb:
+    #     runs = wandb.Api().runs()
+    # try:
+    #     num_runs = len(runs)
+    # except:
+    #     num_runs = 0
     if args.wandb:
-        runs = wandb.Api().runs()
-    try:
-        num_runs = len(runs)
-    except:
-        num_runs = 0
-    if args.wandb:
-        wandb.run.name = f"Run {num_runs+1} with model {args.model}"
+        s = "no " if not args.stratified_sampling else ""
+        f = "with" if args.args.include_features else "without"
+        wandb.run.name = f"Run with model {args.model} on {args.num_epochs} and batch size of {args.batch_size} with {s}stratified sampling {f} features with penalization of false negatives of ratio {args.BCE_weights}"
         wandb.watch(model, log_freq=100)
         wandb.config = args
 

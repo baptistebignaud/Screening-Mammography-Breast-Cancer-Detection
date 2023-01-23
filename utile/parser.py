@@ -7,26 +7,28 @@ parser = argparse.ArgumentParser(description="Training routine for models")
 parser.add_argument(
     "--images_dir",
     type=str,
+    required=True,
     help="Root directory of mammography screenings",
 )
 
 parser.add_argument(
     "--csv_file_path",
     type=str,
+    required=True,
     help="Path for the training's CSV file",
 )
 
 parser.add_argument(
     "--model",
     type=str,
+    required=True,
     choices=["EfficientNet", "ResNet", "ViT"],
     help="The type of mode you want to train/fine-tune",
 )
 parser.add_argument(
     "--layers",
-    type=List,
-    default=None,
-    help="The list of classification layer that need to be taken into account",
+    action="store_true",
+    help="If to change default layers in classifier for models",
 )
 
 parser.add_argument(
@@ -53,9 +55,8 @@ parser.add_argument(
 
 parser.add_argument(
     "--preprocessing_parameters",
-    type=dict,
-    default={},
-    help="Parameters for the pre-processing pipeline",
+    action="store_true",
+    help="If custom parameters for the pre-processing pipeline need to be used",
 )
 
 parser.add_argument(
@@ -68,7 +69,7 @@ parser.add_argument(
 parser.add_argument(
     "--num_epochs",
     type=int,
-    default=50,
+    default=10,
     help="Number of epochs for training",
 )
 
@@ -88,8 +89,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--transform",
-    type=List,
-    default=[],
+    action="store_true",
     help="Additional transform that one could use with pytorch",
 )
 
@@ -123,4 +123,10 @@ parser.add_argument(
     type=int,
     default=8,
     help="Number of available workers for dataloader",
+)
+
+parser.add_argument(
+    "--lr_scheduler",
+    action="store_true",
+    help="If a scheduler needs to be used for the training optimzer",
 )

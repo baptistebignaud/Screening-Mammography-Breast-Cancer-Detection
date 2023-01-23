@@ -28,6 +28,8 @@ from opencv_transforms import transforms
 
 import wandb
 
+from config import *
+
 
 # cf. https://discuss.pytorch.org/t/how-to-enable-the-dataloader-to-sample-from-each-class-with-equal-probability/911/7 answer of Reuben Feinman
 class StratifiedBatchSampler:
@@ -78,6 +80,7 @@ def train_model(
     include_features: bool = False,
     include_wandb: bool = False,
     device: str = "cpu",
+    scheduler_bool: bool = False,
 ) -> tuple:
     """
     Function to train models and keeps track of training
@@ -96,6 +99,8 @@ def train_model(
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_pf1 = 0.0
+    if scheduler_bool:
+        scheduler = set_schduler(optimizer)
     for epoch in range(num_epochs):
         # print("Epoch {}/{}".format(epoch, num_epochs - 1))
         # print("-" * 10)
@@ -168,10 +173,15 @@ def train_model(
                         pf1=pf1,
                         batch=f"{ind+1}/{len(dataloaders[phase])}",
                     )
-                    sleep(0.1)
 
             epoch_loss = running_loss / len(dataloaders[phase].dataset)
             epoch_pf1 = running_pf1 / len(dataloaders[phase].dataset)
+            if scheduler_bool:
+                if scheduler == ReduceLROnPlateau:
+                    scheduler.step(epoch_loss)
+                else:
+                    # TODO handle different types of scheduler
+                    scheduler.step()
 
             try:
                 epoch_pf1 = epoch_pf1.item()
@@ -275,6 +285,17 @@ if __name__ == "__main__":
     # CSV Training file
     train_df = pd.read_csv(args.csv_file_path)
 
+    # If pre processing and transform need to be applied
+    if args.preprocessing_parameters:
+        args.preprocessing_parameters = pre_processing_parameters
+    else:
+        args.preprocessing_parameters = {}
+
+    if args.transform:
+        args.transform = transform_list
+    else:
+        args.transform = []
+
     # Dataset with pre-processing pipeline and potential pytorch transforms
     transformed_dataset = RNSADataset(
         root_dir=args.images_dir,
@@ -289,7 +310,7 @@ if __name__ == "__main__":
         if args.layers:
             model = CustomEfficientNet(
                 n_labels=n_labels,
-                layers=args.layers,
+                layers=layers,
                 features=args.include_features,
                 device=device,
             )
@@ -413,4 +434,5 @@ if __name__ == "__main__":
         include_features=args.include_features,
         include_wandb=args.wandb,
         device=device,
+        scheduler_bool=args.lr_scheduler,
     )

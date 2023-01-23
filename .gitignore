@@ -2,12 +2,11 @@
 notebooks/.ipynb_checkpoints
 notebooks/iframe_figures
 
-# Dataset (to big to be loaded)
+# Dataset (too big to be loaded)
 kaggle_dataset
 
-# Some caches
+# For macos
 .DS_Store
-/utile/__pycache__
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

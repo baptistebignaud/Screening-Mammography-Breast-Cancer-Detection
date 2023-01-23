@@ -292,7 +292,7 @@ class PreProcessingPipeline(object):
             kernel_erosion_shape=kernel_erosion_shape,
         )
         hull = self.get_convex_hull(edges=edges)
-        if not hull:
+        if hull is None:
             return image
         mask = np.zeros_like(image)
 
@@ -390,7 +390,7 @@ class PreProcessingPipeline(object):
         returns: Minimum convex hull (cf. opencv)
         """
         # If the image is fully black
-        if not edges:
+        if edges is None:
             return None
         # Find the non-zero pixels in the image
         points = np.argwhere(edges > 0)

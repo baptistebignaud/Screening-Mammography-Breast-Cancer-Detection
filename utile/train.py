@@ -349,7 +349,7 @@ if __name__ == "__main__":
     #     num_runs = 0
     if args.wandb:
         s = "no " if not args.stratified_sampling else ""
-        f = "with" if args.args.include_features else "without"
+        f = "with" if args.include_features else "without"
         wandb.run.name = f"Run with model {args.model} on {args.num_epochs} and batch size of {args.batch_size} with {s}stratified sampling {f} features with penalization of false negatives of ratio {args.BCE_weights}"
         wandb.watch(model, log_freq=100)
         wandb.config = args

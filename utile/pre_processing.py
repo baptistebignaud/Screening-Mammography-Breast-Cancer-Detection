@@ -18,6 +18,7 @@ class PreProcessingPipeline(object):
         gamma_correction: bool = False,
         inverted_image: bool = False,
         pectoral_muscle: bool = True,
+        resize: bool = False,
         **methods_args,
     ) -> None:
         """
@@ -28,8 +29,11 @@ class PreProcessingPipeline(object):
         remove_line: If one wants to use to remove horizontal white bands in the pre-processing
         normalization: If one wants to use to normalize histograms in the pre-processing
         denoising: If one wants to to denoize images in the pre-processing
+        sharpening: If one wants to sharpen the image
         gamma_correction: If one wants to gamma correct images in the pre-processing
-        sharpening: TODO
+        inverted_image: If one wants to invert image
+        pectoral_muscle: If one wants to remove pectoral muscle
+        resize: If one wants to resize the image
         **methods_args: All possible parameters for functions in pre-processing
 
         returns: None
@@ -43,6 +47,7 @@ class PreProcessingPipeline(object):
         self.gamma_correction = gamma_correction
         self.inverted_image = inverted_image
         self.pectoral_muscle = pectoral_muscle
+        self.resize = resize
 
         # Default values for preprocessing that you can change in calling the constructor of the Pipeline class
         # Methods to adopt in the pipeline for each step
@@ -80,6 +85,8 @@ class PreProcessingPipeline(object):
         self.pectoral_muscle_thresh_mask_edges = 0.95
         self.pectoral_muscle_kernel_erosion_shape = (1, 2)
 
+        self.resize_shape = None
+
         # Possibilty to adjust parameters
         self.__dict__.update(methods_args)
 
@@ -90,7 +97,7 @@ class PreProcessingPipeline(object):
         sample["image"] = torch.tensor(
             np.reshape(
                 np.array(self.pre_process(sample["image"]), dtype=np.float32),
-                (1, sample["image"].shape[0], sample["image"].shape[1]),
+                (1, *self.pre_process(sample["image"]).shape),
             )
         )
         sample["features"] = torch.tensor(
@@ -188,6 +195,9 @@ class PreProcessingPipeline(object):
 
             if self.inverted_image:
                 image = self.invert_image(image)
+
+            if self.resize:
+                image = cv2.resize(image, (self.resize_shape, self.resize_shape))
 
             # Change image by pre processed image
             images[i] = image

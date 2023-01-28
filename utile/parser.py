@@ -21,7 +21,7 @@ parser.add_argument(
 parser.add_argument(
     "--model",
     type=str,
-    required=True,
+    default="EfficientNet",
     choices=["EfficientNet", "ResNet", "ViT"],
     help="The type of mode you want to train/fine-tune",
 )

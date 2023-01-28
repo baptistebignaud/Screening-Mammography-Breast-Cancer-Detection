@@ -19,7 +19,7 @@ from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset
 
 from parser import parser
-from models import CustomEfficientNet
+from models import CustomModel
 from loaders import RNSADataset
 from pre_processing import PreProcessingPipeline
 from torch.utils.data import DataLoader
@@ -296,6 +296,9 @@ if __name__ == "__main__":
     else:
         args.transform = []
 
+    if args.model == "ViT":
+        args.preprocessing_parameters["resize"] = True
+        args.preprocessing_parameters["resize_shape"] = ViTs[ViT_str]["resize_shape"]
     # Dataset with pre-processing pipeline and potential pytorch transforms
     transformed_dataset = RNSADataset(
         root_dir=args.images_dir,
@@ -306,26 +309,22 @@ if __name__ == "__main__":
     )
 
     # Load model
-    if args.model == "EfficientNet":
-        if args.layers:
-            model = CustomEfficientNet(
-                n_labels=n_labels,
-                layers=layers,
-                features=args.include_features,
-                device=device,
-            )
-        else:
-            model = CustomEfficientNet(
-                n_labels=n_labels,
-                features=args.include_features,
-                device=device,
-            )
-    elif args.model == "ResNet":
-        pass
-        # TODO
-    elif args.model == "ViT":
-        pass
-        # TODO
+    if args.layers:
+        model = CustomModel(
+            backbone=args.model,
+            n_labels=n_labels,
+            layers=layers,
+            features=args.include_features,
+            device=device,
+        )
+    else:
+        model = CustomModel(
+            backbone=args.model,
+            n_labels=n_labels,
+            features=args.include_features,
+            device=device,
+        )
+
     # Define loss
     # TODO adapt loss if there are several labels
     if args.loss == "BCE":

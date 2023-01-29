@@ -13,9 +13,6 @@ from pre_processing import PreProcessingPipeline
 from opencv_transforms import transforms
 
 
-img_path = "../kaggle_dataset"
-
-
 def load_file(
     files: str or List[str] or List[np.array], n: int, m: int = None, seed: int = None
 ) -> List:
@@ -82,24 +79,6 @@ def load_image(
     return img
 
 
-def create_batch(
-    df: pd.DataFrame, n: int = 64, label_ratio: float = 0.2, L_samples: List = None
-):
-    if not L_samples:
-        n_positive = int(n * label_ratio)
-        n_negative = n - n_positive
-        df_sample_positive = df[df["cancer"] == 1].sample(n_positive)
-        df_sample_negative = df[df["cancer"] == 0].sample(n_negative)
-        df_sample = pd.concat([df_sample_positive, df_sample_negative])
-        L_samples = df_sample.apply(
-            lambda x: "".join(
-                [img_path, "/", str(x["patient_id"]), "_", str(x["image_id"]), ".png"]
-            ),
-            axis=1,
-        ).tolist()
-    return [load_image(img_path, elem) for elem in L_samples]
-
-
 class RNSADataset(Dataset):
     """
     RNSA dataset
@@ -148,8 +127,8 @@ class RNSADataset(Dataset):
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
-
-        img_name = os.path.join(self.root_dir, self.RNSA_frame.iloc[idx]["path"])
+        img_name = self.RNSA_frame.iloc[idx]["path"]
+        # img_name = os.path.join(self.root_dir, self.RNSA_frame.iloc[idx]["path"])
         image = cv2.imread(img_name)
         features = self.RNSA_frame.iloc[idx][self.ohe_columns].to_numpy()
 

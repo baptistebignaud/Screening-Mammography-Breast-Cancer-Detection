@@ -6,7 +6,7 @@ import copy
 import warnings
 import random
 
-# sys.path.insert(0, "/appli")
+sys.path.insert(0, "./utile")
 
 import pandas as pd
 from tqdm import tqdm
@@ -18,17 +18,17 @@ from torch.nn import MSELoss
 from sklearn.model_selection import StratifiedKFold
 from torch.utils.data import Subset
 
-from parser import parser
-from models import CustomModel
-from loaders import RNSADataset
-from pre_processing import PreProcessingPipeline
+from utile.parser import parser
+from utile.models import CustomModel
+from utile.loaders import RNSADataset
+from utile.pre_processing import PreProcessingPipeline
 from torch.utils.data import DataLoader
 
 from opencv_transforms import transforms
 
 import wandb
 
-from config import *
+from utile.config import *
 
 
 # cf. https://discuss.pytorch.org/t/how-to-enable-the-dataloader-to-sample-from-each-class-with-equal-probability/911/7 answer of Reuben Feinman

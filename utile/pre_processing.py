@@ -19,6 +19,7 @@ class PreProcessingPipeline(object):
         inverted_image: bool = False,
         pectoral_muscle: bool = True,
         resize: bool = False,
+        duplicate_channels: bool = False,
         **methods_args,
     ) -> None:
         """
@@ -48,6 +49,7 @@ class PreProcessingPipeline(object):
         self.inverted_image = inverted_image
         self.pectoral_muscle = pectoral_muscle
         self.resize = resize
+        self.duplicate_channels = duplicate_channels
 
         # Default values for preprocessing that you can change in calling the constructor of the Pipeline class
         # Methods to adopt in the pipeline for each step
@@ -100,6 +102,8 @@ class PreProcessingPipeline(object):
                 (1, *self.pre_process(sample["image"]).shape),
             )
         )
+        if self.duplicate_channels:
+            sample["image"] = sample["image"].squeeze(0).repeat(3, 1, 1)
         sample["features"] = torch.tensor(
             np.array(sample["features"], dtype=np.float32)
         )

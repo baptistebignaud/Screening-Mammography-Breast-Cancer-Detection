@@ -34,6 +34,7 @@ class CustomModel(nn.Module):
         ],
         nb_channels: int = 1,
         pretrained: bool = True,
+        duplicate_channels: bool = False,
     ):
         """
         Custom models with custom layers
@@ -60,6 +61,7 @@ class CustomModel(nn.Module):
         self.n_labels = n_labels
         self.nb_channels = nb_channels
         self.pretrained = pretrained
+        self.duplicate_channels = duplicate_channels
 
         l_linear = [layer for layer in layers if isinstance(layer, nn.Linear)]
         # if not (l_linear[0].weight.shape[1] == 1280):
@@ -79,14 +81,15 @@ class CustomModel(nn.Module):
             )
 
             # Adjust to use Grayscale rather than RBG images
-            self.network.stem.conv = Conv2d(
-                self.nb_channels,
-                32,
-                kernel_size=(3, 3),
-                stride=(2, 2),
-                padding=(1, 1),
-                bias=False,
-            )
+            if not duplicate_channels:
+                self.network.stem.conv = Conv2d(
+                    self.nb_channels,
+                    32,
+                    kernel_size=(3, 3),
+                    stride=(2, 2),
+                    padding=(1, 1),
+                    bias=False,
+                )
 
             self.network.classifier.fc = nn.Linear(
                 in_features=1280, out_features=1280, bias=True
@@ -97,13 +100,20 @@ class CustomModel(nn.Module):
                 vit_weights = ViTs[ViT_str]["weights"]
             self.network = ViTs[ViT_str]["model"](weights=vit_weights)
 
-            self.network.conv_proj = Conv2d(
-                self.nb_channels,
-                self.network.hidden_dim // ((self.network.patch_size) ** 2),
-                kernel_size=(3, 3),
-                stride=(1, 1),
-                padding=(1, 1),
-            )
+            # self.network.conv_proj = Conv2d(
+            #     self.nb_channels,
+            #     self.network.hidden_dim // ((self.network.patch_size) ** 2),
+            #     kernel_size=(3, 3),
+            #     stride=(1, 1),
+            #     padding=(1, 1),
+            # )
+            if not duplicate_channels:
+                self.network.conv_proj = nn.Conv2d(
+                    in_channels=1,
+                    out_channels=self.network.hidden_dim,
+                    kernel_size=self.network.patch_size,
+                    stride=self.network.patch_size,
+                )
             # self.network.heads = nn.Linear(
             #     in_features=1280, out_features=1280, bias=True
             # )
@@ -111,14 +121,15 @@ class CustomModel(nn.Module):
             self.network = torch.hub.load(
                 "pytorch/vision:v0.10.0", ResNet_str, pretrained=self.pretrained
             )
-            self.network.conv1 = Conv2d(
-                self.nb_channels,
-                64,
-                kernel_size=(7, 7),
-                stride=(2, 2),
-                padding=(3, 3),
-                bias=False,
-            )
+            if not duplicate_channels:
+                self.network.conv1 = Conv2d(
+                    self.nb_channels,
+                    64,
+                    kernel_size=(7, 7),
+                    stride=(2, 2),
+                    padding=(3, 3),
+                    bias=False,
+                )
         # Replace last layer
         self.classifier = nn.Sequential(
             *layers,

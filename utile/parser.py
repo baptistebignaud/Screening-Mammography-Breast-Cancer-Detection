@@ -96,7 +96,7 @@ parser.add_argument(
 parser.add_argument(
     "--BCE_weights",
     type=float,
-    default=3,
+    default=50,
     help="How much false negatives should be penalized (false positives will be penalize with a factor 1)",
 )
 
@@ -129,4 +129,10 @@ parser.add_argument(
     "--lr_scheduler",
     action="store_true",
     help="If a scheduler needs to be used for the training optimzer",
+)
+
+parser.add_argument(
+    "--duplicate_channels",
+    action="store_true",
+    help="Either to use rgb or duplicate channels",
 )

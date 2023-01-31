@@ -299,6 +299,9 @@ if __name__ == "__main__":
     if args.model == "ViT":
         args.preprocessing_parameters["resize"] = True
         args.preprocessing_parameters["resize_shape"] = ViTs[ViT_str]["resize_shape"]
+
+    args.preprocessing_parameters["duplicate_channels"] = args.duplicate_channels
+
     # Dataset with pre-processing pipeline and potential pytorch transforms
     transformed_dataset = RNSADataset(
         root_dir=args.images_dir,
@@ -316,6 +319,7 @@ if __name__ == "__main__":
             layers=layers,
             features=args.include_features,
             device=device,
+            duplicate_channels=args.duplicate_channels,
         )
     else:
         model = CustomModel(
@@ -323,6 +327,7 @@ if __name__ == "__main__":
             n_labels=n_labels,
             features=args.include_features,
             device=device,
+            duplicate_channels=args.duplicate_channels,
         )
 
     # Define loss

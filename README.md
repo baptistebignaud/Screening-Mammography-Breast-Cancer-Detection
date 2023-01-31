@@ -1,6 +1,6 @@
-<font size="6"> RSNA-Screening-Mammography-Breast-Cancer-Detection-kaggle</font><br><br>
+<font size="6"> Breast Cancer Detection from mammography screenings</font><br><br>
 
-**This repository's aim is to contribute to the kaggle challenge RSNA-Screening-Mammography-Breast-Cancer-Detection** <br><br>
+**This repository's aim is to offer a baseline framework which you can use easily to tackle Breast Cancer detection. You can find dataloaders, preprocessing pipeline (with different preprocessing steps among normalization, pectoral muscle removal...) and some models you can fine-tune easily. It was built to use RSNA-Screening-Mammography-Breast-Cancer-Detection dataset but one could adapt the repository to use it on any screening mammography dataset** <br><br>
 
 <font size="6"> Table of contents</font>
 
@@ -89,7 +89,7 @@ With PID being the process ID of python (for notebook)
 
 ## Run training model
 
-> `python3 train.py --images_dir "../kaggle_dataset" --csv_file_path "../data/train.csv" --model "EfficientNet" --num_epochs 1`
+> `python3 train.py --images_dir "kaggle_dataset" --csv_file_path "data/train.csv" --model "EfficientNet" --num_epochs 1`
 
 # References
 

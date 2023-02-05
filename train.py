@@ -23,6 +23,7 @@ from utile.models import CustomModel
 from utile.loaders import RNSADataset
 from utile.pre_processing import PreProcessingPipeline
 from torch.utils.data import DataLoader
+from utile.augmentation import AugmentationPipeline
 
 from opencv_transforms import transforms
 
@@ -291,23 +292,32 @@ if __name__ == "__main__":
     else:
         args.preprocessing_parameters = {}
 
-    if args.transform:
-        args.transform = transform_list
+    if args.basic_augmentation:
+        args.augmentation_parameters = pre_processing_parameters
     else:
-        args.transform = []
+        args.basic_augmentation = {}
 
+    # Small adapatation for ViT
     if args.model == "ViT":
         args.preprocessing_parameters["resize"] = True
         args.preprocessing_parameters["resize_shape"] = ViTs[ViT_str]["resize_shape"]
 
     args.preprocessing_parameters["duplicate_channels"] = args.duplicate_channels
 
+    if args.basic_augmentation:
+        transform = transforms.Compose(
+            [
+                PreProcessingPipeline(**args.preprocessing_parameters),
+                AugmentationPipeline(**args.augmentation_parameters),
+            ]
+        )
+
     # Dataset with pre-processing pipeline and potential pytorch transforms
     transformed_dataset = RNSADataset(
         root_dir=args.images_dir,
         csv_file=args.csv_file_path,
         transform=transforms.Compose(
-            [PreProcessingPipeline(**args.preprocessing_parameters), *args.transform]
+            [PreProcessingPipeline(**args.preprocessing_parameters)]
         ),
     )
 

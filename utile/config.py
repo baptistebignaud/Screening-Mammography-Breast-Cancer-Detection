@@ -28,8 +28,9 @@ layers = [
 # Cf pre_processing.py
 pre_processing_parameters = {}
 
-# Transform list
-transform_list = []
+# Cf augmentation.py
+augmentation_parameters = {}
+
 
 ################## backbone models ##################
 ######### EfficientNet #########

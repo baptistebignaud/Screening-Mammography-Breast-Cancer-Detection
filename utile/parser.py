@@ -87,11 +87,6 @@ parser.add_argument(
     help="Seed for reproductible results",
 )
 
-parser.add_argument(
-    "--transform",
-    action="store_true",
-    help="Additional transform that one could use with pytorch",
-)
 
 parser.add_argument(
     "--BCE_weights",
@@ -135,4 +130,10 @@ parser.add_argument(
     "--duplicate_channels",
     action="store_true",
     help="Either to use rgb or duplicate channels",
+)
+
+parser.add_argument(
+    "--basic_augmentation",
+    action="store_true",
+    help="If one wants to use classical data augmentation techniques",
 )

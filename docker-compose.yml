@@ -1,31 +1,37 @@
-version: '3.9'
+version: "3.9"
 services:
+  rmbscd:
+    tty: true
+    build:
+      context: .
+      shm_size: "5gb"
+    shm_size: "5gb"
+    ports:
+      - "4000:4000"
+      - "8888:8888" #Notebook port
+      - "6006:6006" # Tensorboard
 
-   rmbscd:
-      tty: true
-      build:
-         context: .
-         shm_size: '12gb'
-      shm_size: '12gb'
-      ports:
-         - '4000:4000'
-         - '8888:8888' #Notebook port
-         - '6006:6006' # Tensorboard
+    container_name: "rmbscd"
+    volumes:
+      - ./:/appli
 
-      container_name: 'rmbscd'
-      volumes:
-         - ./:/appli
+    networks:
+      - rmbscd_network
 
-      networks:
-         - rmbscd_network
-      environment:
-         LD_PRELOAD: /usr/lib/aarch64-linux-gnu/libgomp.so.1
-         # deploy:
-         #    resources:
-         #       reservations:
-         #          devices:
-         #             - capabilities: [gpu]
-         #               driver: nvidia
+    # To uncomment if you work with a mac
+    # environment:
+    #   LD_PRELOAD: /usr/lib/aarch64-linux-gnu/libgomp.so.1
+    deploy:
+      resources:
+        limits:
+          cpus: "0.6"
+          memory: 4.4G
 
+        reservations:
+          cpus: "0.5"
+          memory: 4.4G
+          devices:
+            - capabilities: [gpu]
+              driver: nvidia
 networks:
-   rmbscd_network:
+  rmbscd_network:

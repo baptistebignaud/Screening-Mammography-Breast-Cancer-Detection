@@ -10,6 +10,13 @@
 - [Results](#results)
 - [Openings](#openings)
 - [Usefull commands and installation](#usefull-commands-and-installation)
+  - [Build the container](#build-the-container)
+  - [Up containers](#up-containers)
+  - [Stop containers](#stop-containers)
+  - [Open a shell inside the main container](#open-a-shell-inside-the-main-container)
+  - [Run jupyter lab from the container](#run-jupyter-lab-from-the-container)
+  - [If some issues with jupyter lab or port already on used on 8888](#if-some-issues-with-jupyter-lab-or-port-already-on-used-on-8888)
+  - [Run training model](#run-training-model)
 - [References](#references)
 
 # Introduction to the topic
@@ -83,9 +90,8 @@ Be carefull, the repository is built to give the possibility to use a GPU. If yo
 
 ## If some issues with jupyter lab or port already on used on 8888
 
-> `lsof -i :8888` <br>
-> `kill -9 <PID>` <br>
-With PID being the process ID of python (for notebook)
+> `lsof -i :8888` <br> > `kill -9 <PID>` <br>
+> With PID being the process ID of python (for notebook)
 
 ## Run training model
 

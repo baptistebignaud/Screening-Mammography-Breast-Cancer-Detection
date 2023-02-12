@@ -91,7 +91,7 @@ parser.add_argument(
 parser.add_argument(
     "--BCE_weights",
     type=float,
-    default=50,
+    default=25,
     help="How much false negatives should be penalized (false positives will be penalize with a factor 1)",
 )
 
@@ -145,7 +145,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--external_sampler",
+    "--multinomial_sampler",
     action="store_true",
     help="If one wants to use an external sampler",
 )

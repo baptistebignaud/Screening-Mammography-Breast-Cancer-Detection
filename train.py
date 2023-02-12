@@ -266,7 +266,9 @@ if __name__ == "__main__":
             duplicate_channels=args.duplicate_channels,
             freeze_backbone=args.freeze_backbone,
         )
-
+    # Avoid having weights with multinomial sampler
+    if args.multinomial_sampler:
+        args.BCE_weights = 1
     # Define loss
     # TODO adapt loss if there are several labels
     if args.loss == "BCE":
@@ -296,7 +298,7 @@ if __name__ == "__main__":
         wandb.config = args
 
     # If stratified sampling (to have the same ratio for classes between each batch)
-    if args.stratified_sampling or args.external_sampler:
+    if args.stratified_sampling or args.multinomial_sampler:
 
         # Creating data indices for training and validation splits:
         dataset_size = len(transformed_dataset)
@@ -312,7 +314,7 @@ if __name__ == "__main__":
         final_dataset["train"] = Subset(transformed_dataset, train_indices)
         final_dataset["validation"] = Subset(transformed_dataset, val_indices)
 
-        if args.external_sampler:
+        if args.multinomial_sampler:
             train_sampler = ImbalancedDatasetSampler(
                 labels=train_df["cancer"].iloc[train_indices],
                 batch_size=args.batch_size,

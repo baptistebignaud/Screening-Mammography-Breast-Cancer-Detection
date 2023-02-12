@@ -6,7 +6,7 @@ import copy
 import warnings
 import random
 
-sys.path.insert(0, "./utile")
+sys.path.insert(0, "./utils")
 
 import pandas as pd
 from tqdm import tqdm
@@ -15,61 +15,21 @@ import numpy as np
 import torch
 from torch import nn, optim
 from torch.nn import MSELoss
-from sklearn.model_selection import StratifiedKFold
+
 from torch.utils.data import Subset
 
-from utile.parser import parser
-from utile.models import CustomModel
-from utile.loaders import RNSADataset
-from utile.pre_processing import PreProcessingPipeline
+from utils.parser import parser
+from utils.models import CustomModel
+from utils.loaders import RNSADataset
+from utils.pre_processing import PreProcessingPipeline
 from torch.utils.data import DataLoader
-from utile.augmentation import AugmentationPipeline
-
+from utils.augmentation import AugmentationPipeline
+from utils.samplers import StratifiedBatchSampler, ImbalancedDatasetSampler
+from utils.config import *
+from utils.eval import pfbeta, CustomBCELoss
 from opencv_transforms import transforms
 
 import wandb
-
-from utile.config import *
-
-
-# cf. https://discuss.pytorch.org/t/how-to-enable-the-dataloader-to-sample-from-each-class-with-equal-probability/911/7 answer of Reuben Feinman
-class StratifiedBatchSampler:
-    """Stratified batch sampling
-    Provides equal representation of target classes in each batch
-    """
-
-    def __init__(self, y, batch_size, shuffle=True):
-        assert len(y.shape) == 1, "label array must be 1D"
-        n_batches = int(len(y) / batch_size)
-        self.batch_size = batch_size
-        self.skf = StratifiedKFold(n_splits=n_batches, shuffle=shuffle)
-        self.X = torch.randn(len(y), 1).numpy()
-        self.y = y
-        self.shuffle = shuffle
-
-    def __iter__(self):
-        if self.shuffle:
-            torch.randint(0, int(1e8), size=()).item()
-        for _, indices in self.skf.split(self.X, self.y):
-            yield indices
-
-    def __len__(self):
-        return len(self.y) // self.batch_size
-
-
-class CustomBCELoss(torch.nn.Module):
-    def __init__(self, weight_fn=None):
-        super(CustomBCELoss, self).__init__()
-        self.loss_fn = torch.nn.BCELoss()
-        if weight_fn is None:
-            weight_fn = lambda x: 1
-        self.weight_fn = weight_fn
-
-    def forward(self, input, target):
-        weight = self.weight_fn(target)
-        loss = self.loss_fn(input, target)
-        weighted_loss = weight * loss
-        return weighted_loss.mean()
 
 
 def train_model(
@@ -224,41 +184,6 @@ def train_model(
     return model, val_pf1_history
 
 
-def pfbeta(labels, predictions, beta: float = 1):
-    """
-    Official implementation of the evaluation metrics, pf1 Score,
-    cf. https://www.kaggle.com/competitions/rsna-breast-cancer-detection/overview/evaluation
-    """
-    y_true_count = 0
-    ctp = 0
-    cfp = 0
-    for idx in range(len(labels)):
-
-        prediction = min(max(predictions[idx], 0), 1)
-        if labels[idx]:
-            y_true_count += 1
-            ctp += prediction
-        else:
-            cfp += prediction
-
-    # Add if ever there is no true prediction to avoid divide by 0
-    if y_true_count == 0:
-        return 0
-
-    beta_squared = beta * beta
-    c_precision = ctp / (ctp + cfp)
-    c_recall = ctp / y_true_count
-    if c_precision > 0 and c_recall > 0:
-        result = (
-            (1 + beta_squared)
-            * (c_precision * c_recall)
-            / (beta_squared * c_precision + c_recall)
-        )
-        return result
-    else:
-        return 0
-
-
 if __name__ == "__main__":
 
     # Avoid useless warnings
@@ -330,6 +255,7 @@ if __name__ == "__main__":
             features=args.include_features,
             device=device,
             duplicate_channels=args.duplicate_channels,
+            freeze_backbone=args.freeze_backbone,
         )
     else:
         model = CustomModel(
@@ -338,6 +264,7 @@ if __name__ == "__main__":
             features=args.include_features,
             device=device,
             duplicate_channels=args.duplicate_channels,
+            freeze_backbone=args.freeze_backbone,
         )
 
     # Define loss
@@ -369,7 +296,7 @@ if __name__ == "__main__":
         wandb.config = args
 
     # If stratified sampling (to have the same ratio for classes between each batch)
-    if args.stratified_sampling:
+    if args.stratified_sampling or args.external_sampler:
 
         # Creating data indices for training and validation splits:
         dataset_size = len(transformed_dataset)
@@ -380,20 +307,30 @@ if __name__ == "__main__":
             indices[:split]
         )
 
-        # Set stratified samplers
-        train_sampler = StratifiedBatchSampler(
-            train_df["cancer"].iloc[train_indices],
-            args.batch_size,
-        )
-        valid_sampler = StratifiedBatchSampler(
-            train_df["cancer"].iloc[val_indices],
-            args.batch_size,
-        )
-
         # Define datasets
         final_dataset = {}
         final_dataset["train"] = Subset(transformed_dataset, train_indices)
         final_dataset["validation"] = Subset(transformed_dataset, val_indices)
+
+        if args.external_sampler:
+            train_sampler = ImbalancedDatasetSampler(
+                labels=train_df["cancer"].iloc[train_indices],
+                batch_size=args.batch_size,
+            )
+            valid_sampler = ImbalancedDatasetSampler(
+                labels=train_df["cancer"].iloc[val_indices],
+                batch_size=args.batch_size,
+            )
+        else:
+            # Set stratified samplers
+            train_sampler = StratifiedBatchSampler(
+                train_df["cancer"].iloc[train_indices],
+                args.batch_size,
+            )
+            valid_sampler = StratifiedBatchSampler(
+                train_df["cancer"].iloc[val_indices],
+                args.batch_size,
+            )
 
         # Define dataloaders
         dataloader = {}

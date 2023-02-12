@@ -137,3 +137,15 @@ parser.add_argument(
     action="store_true",
     help="If one wants to use classical data augmentation techniques",
 )
+
+parser.add_argument(
+    "--freeze_backbone",
+    action="store_true",
+    help="To freeze or not the backbone model",
+)
+
+parser.add_argument(
+    "--external_sampler",
+    action="store_true",
+    help="If one wants to use an external sampler",
+)

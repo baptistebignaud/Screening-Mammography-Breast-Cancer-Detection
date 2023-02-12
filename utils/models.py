@@ -35,6 +35,7 @@ class CustomModel(nn.Module):
         nb_channels: int = 1,
         pretrained: bool = True,
         duplicate_channels: bool = False,
+        freeze_backbone: bool = False,
     ):
         """
         Custom models with custom layers
@@ -62,6 +63,7 @@ class CustomModel(nn.Module):
         self.nb_channels = nb_channels
         self.pretrained = pretrained
         self.duplicate_channels = duplicate_channels
+        self.freeze_backbone = freeze_backbone
 
         l_linear = [layer for layer in layers if isinstance(layer, nn.Linear)]
         # if not (l_linear[0].weight.shape[1] == 1280):
@@ -130,6 +132,9 @@ class CustomModel(nn.Module):
                     padding=(3, 3),
                     bias=False,
                 )
+        if self.freeze_backbone:
+            for param in self.network.parameters():
+                param.requires_grad = False
         # Replace last layer
         self.classifier = nn.Sequential(
             *layers,

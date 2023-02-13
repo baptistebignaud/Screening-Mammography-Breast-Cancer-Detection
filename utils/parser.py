@@ -4,6 +4,8 @@ from typing import List
 
 parser = argparse.ArgumentParser(description="Training routine for models")
 
+########################### Data directories (mandatory) ###########################
+
 parser.add_argument(
     "--images_dir",
     type=str,
@@ -18,6 +20,7 @@ parser.add_argument(
     help="Path for the training's CSV file",
 )
 
+########################### Model information ###########################
 parser.add_argument(
     "--model",
     type=str,
@@ -30,6 +33,26 @@ parser.add_argument(
     action="store_true",
     help="If to change default layers in classifier for models",
 )
+parser.add_argument(
+    "--labels",
+    type=List,
+    default=["cancer"],
+    help="Number of labels that need to be predicted (1 if one wants to only predit label cancer, could be more)",
+)
+
+parser.add_argument(
+    "--include_features",
+    action="store_true",
+    help="If features need to be included as prior in the models",
+)
+
+parser.add_argument(
+    "--freeze_backbone",
+    action="store_true",
+    help="To freeze or not the backbone model",
+)
+
+########################### Optimizer information ###########################
 
 parser.add_argument(
     "--loss",
@@ -40,13 +63,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--labels",
-    type=List,
-    default=["cancer"],
-    help="Number of labels that need to be predicted (1 if one wants to only predit label cancer, could be more)",
-)
-
-parser.add_argument(
     "--lr",
     type=float,
     default=0.0001,
@@ -54,23 +70,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--preprocessing_parameters",
-    action="store_true",
-    help="If custom parameters for the pre-processing pipeline need to be used",
-)
-
-parser.add_argument(
     "--batch_size",
     type=int,
     default=16,
     help="Batch size for training",
-)
-
-parser.add_argument(
-    "--num_epochs",
-    type=int,
-    default=10,
-    help="Number of epochs for training",
 )
 
 parser.add_argument(
@@ -96,15 +99,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--include_features",
-    action="store_true",
-    help="If features need to be included as prior in the models",
-)
-
-parser.add_argument(
-    "--wandb",
-    action="store_true",
-    help="If wandb need to be set up to save models",
+    "--num_epochs",
+    type=int,
+    default=10,
+    help="Number of epochs for training",
 )
 
 parser.add_argument(
@@ -127,6 +125,33 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--multinomial_sampler",
+    action="store_true",
+    help="If one wants to use an external sampler",
+)
+
+parser.add_argument(
+    "--multinomial_sampler_BCE_weights",
+    type=float,
+    default=5,
+    help="How much false negatives should be penalized (false positives will be penalize with a factor 1) if multinomial sampler is used",
+)
+
+########################### Preprocessing information ###########################
+
+parser.add_argument(
+    "--no_preprocessing",
+    action="store_true",
+    help="If one wants to apply no pre-processing pipeline",
+)
+
+parser.add_argument(
+    "--preprocessing_parameters",
+    action="store_true",
+    help="If custom parameters for the pre-processing pipeline need to be used",
+)
+
+parser.add_argument(
     "--duplicate_channels",
     action="store_true",
     help="Either to use rgb or duplicate channels",
@@ -138,14 +163,10 @@ parser.add_argument(
     help="If one wants to use classical data augmentation techniques",
 )
 
-parser.add_argument(
-    "--freeze_backbone",
-    action="store_true",
-    help="To freeze or not the backbone model",
-)
+########################### Track of experiments ###########################
 
 parser.add_argument(
-    "--multinomial_sampler",
+    "--wandb",
     action="store_true",
-    help="If one wants to use an external sampler",
+    help="If wandb need to be set up to save models",
 )

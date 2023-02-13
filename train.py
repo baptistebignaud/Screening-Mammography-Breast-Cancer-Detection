@@ -1,10 +1,12 @@
 import sys
 import os
+from os.path import join
 import time
 from time import sleep
 import copy
 import warnings
 import random
+from pathlib import Path
 
 sys.path.insert(0, "./utils")
 
@@ -54,10 +56,9 @@ def train_model(
     returns: The best model with history of val pf1
     """
     since = time.time()
-    val_pf1_history = []
+    # val_pf1_history = []
     if device == "cuda":
         device = torch.device("cuda")
-
     best_model_wts = copy.deepcopy(model.state_dict())
     best_pf1 = 0.0
     if scheduler_bool:
@@ -77,10 +78,10 @@ def train_model(
             running_loss = 0.0
             running_pf1 = 0.0
             running_corrects = 0
-            phase = "train"
             # Iterate over data.
             with tqdm(enumerate(dataloaders[phase])) as tepoch:
                 for ind, elem in tepoch:
+
                     tepoch.set_description(f"Epoch {epoch+1}/{num_epochs}")
                     # print(
                     #     f"Batch {ind+1} of {len(dataloaders[phase])} batches ", end="\r"
@@ -146,30 +147,44 @@ def train_model(
 
             try:
                 epoch_pf1 = epoch_pf1.item()
+
             except:
                 pass
 
             print(
-                f"Epoch {epoch} for {phase}: \t Loss: {epoch_loss:.4f}, pf1: {epoch_pf1:.4f}"
+                f"Epoch {epoch+1} for {phase}: \t Loss: {epoch_loss:.4f}, pf1: {epoch_pf1:.4f}"
             )
 
-            if phase == "val" and epoch_pf1 > best_pf1:
-                if include_wandb:
-                    torch.save(
-                        {
-                            "epoch": epoch,
-                            "model_state_dict": model.state_dict(),
-                            "optimizer_state_dict": optimizer.state_dict(),
-                            "loss": epoch_loss,
-                        },
-                        os.path.join(
-                            wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"
-                        ),
-                    )
-                best_pf1 = epoch_pf1
-                best_model_wts = copy.deepcopy(model.state_dict())
             if phase == "val":
-                val_pf1_history.append(epoch_pf1)
+
+                if epoch_pf1 > best_pf1:
+                    if include_wandb:
+                        print("saving model")
+                        n_models = len([name for name in os.listdir("models")])
+                        torch.save(
+                            {
+                                "model": model,
+                                "epoch": epoch,
+                                "model_state_dict": model.state_dict(),
+                                "optimizer_state_dict": optimizer.state_dict(),
+                                "loss": epoch_loss,
+                                "pf1": epoch_pf1,
+                            },
+                            # join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"),
+                            f"models/model_{n_models+1}_{wandb.run.name}.pt",
+                        )
+                    best_pf1 = epoch_pf1
+            if include_wandb:
+                wandb.log(
+                    {
+                        f"{phase}_loss": epoch_loss,
+                        f"{phase}_pf1": epoch_pf1,
+                    }
+                )
+
+            # best_model_wts = copy.deepcopy(model.state_dict())
+            # if phase == "val":
+            #     val_pf1_history.append(epoch_pf1)
 
     time_elapsed = time.time() - since
     print(
@@ -181,7 +196,7 @@ def train_model(
 
     # load best model weights
     model.load_state_dict(best_model_wts)
-    return model, val_pf1_history
+    return model  # , val_pf1_history
 
 
 if __name__ == "__main__":
@@ -230,20 +245,28 @@ if __name__ == "__main__":
     args.preprocessing_parameters["duplicate_channels"] = args.duplicate_channels
 
     if args.basic_augmentation:
+        pre_processing_pipeline = PreProcessingPipeline(**args.preprocessing_parameters)
+        augmentation_pipeline = AugmentationPipeline(**args.augmentation_parameters)
+
         transform = transforms.Compose(
             [
-                PreProcessingPipeline(**args.preprocessing_parameters),
-                AugmentationPipeline(**args.augmentation_parameters),
+                pre_processing_pipeline,
+                augmentation_pipeline,
             ]
+        )
+
+    else:
+        pre_processing_pipeline = PreProcessingPipeline(**args.preprocessing_parameters)
+        augmentation_pipeline = None
+        transform = transforms.Compose(
+            [PreProcessingPipeline(**args.preprocessing_parameters)]
         )
 
     # Dataset with pre-processing pipeline and potential pytorch transforms
     transformed_dataset = RNSADataset(
         root_dir=args.images_dir,
         csv_file=args.csv_file_path,
-        transform=transforms.Compose(
-            [PreProcessingPipeline(**args.preprocessing_parameters)]
-        ),
+        transform=transform,
     )
 
     # Load model
@@ -266,9 +289,39 @@ if __name__ == "__main__":
             duplicate_channels=args.duplicate_channels,
             freeze_backbone=args.freeze_backbone,
         )
+    if args.wandb:
+        wandb_data = wandb.Artifact(
+            name="RNSA_dataset",
+            type="dataset",
+            description="Information about the dataset with different preprocessing and transform parameters",
+            metadata={
+                "source": "https://www.kaggle.com/competitions/rsna-breast-cancer-detection",
+                "pre_processing_parameters": pre_processing_pipeline.__dict__
+                if isinstance(pre_processing_pipeline, PreProcessingPipeline)
+                else None,
+                "augmentation_parameters": augmentation_pipeline.__dict__
+                if isinstance(augmentation_pipeline, AugmentationPipeline)
+                else None,
+            },
+        )
+        wandb_model = wandb.Artifact(
+            name=f"{args.model}",
+            type="model",
+            description=f"Information about the model with backbone {args.model} used for training",
+            metadata={
+                "Parser configuration": vars(args),
+                "Classification Layers": layers,
+                "Backbone": EfficientNet_str
+                if args.model == "EfficientNet"
+                else ViT_str
+                if args.model == "ViT"
+                else ResNet_str,
+            },
+        )
+        wandb.log_artifact(wandb_data)
     # Avoid having weights with multinomial sampler
     if args.multinomial_sampler:
-        args.BCE_weights = 1
+        args.BCE_weights = args.multinomial_sampler_BCE_weights
     # Define loss
     # TODO adapt loss if there are several labels
     if args.loss == "BCE":
@@ -291,9 +344,10 @@ if __name__ == "__main__":
     # except:
     #     num_runs = 0
     if args.wandb:
-        s = "no " if not args.stratified_sampling else ""
+        s = "no " if not (args.stratified_sampling and args.multinomial_sampler) else ""
         f = "with" if args.include_features else "without"
-        wandb.run.name = f"Run with model {args.model} on {args.num_epochs} and batch size of {args.batch_size} with {s}stratified sampling {f} features with penalization of false negatives of ratio {args.BCE_weights}"
+        a = "with" if args.basic_augmentation else "without"
+        wandb.run.name = f"Run with model {args.model} on {args.num_epochs} epochs and batch size of {args.batch_size} with {s} sampling {a} augmentation {f} features with penalization of false negatives of ratio {args.BCE_weights}"
         wandb.watch(model, log_freq=100)
         wandb.config = args
 
@@ -312,9 +366,10 @@ if __name__ == "__main__":
         # Define datasets
         final_dataset = {}
         final_dataset["train"] = Subset(transformed_dataset, train_indices)
-        final_dataset["validation"] = Subset(transformed_dataset, val_indices)
+        final_dataset["val"] = Subset(transformed_dataset, val_indices)
 
         if args.multinomial_sampler:
+
             train_sampler = ImbalancedDatasetSampler(
                 labels=train_df["cancer"].iloc[train_indices],
                 batch_size=args.batch_size,
@@ -341,10 +396,10 @@ if __name__ == "__main__":
             num_workers=8,
             batch_sampler=train_sampler,
         )
-        dataloader["validation"] = DataLoader(
-            final_dataset["train"],
+        dataloader["val"] = DataLoader(
+            final_dataset["val"],
             num_workers=8,
-            sampler=valid_sampler,
+            batch_sampler=valid_sampler,
         )
 
     # If not stratified sampling
@@ -355,10 +410,7 @@ if __name__ == "__main__":
 
         # Define dataset
         final_dataset = {}
-        (
-            final_dataset["train"],
-            final_dataset["validation"],
-        ) = torch.utils.data.random_split(
+        (final_dataset["train"], final_dataset["val"],) = torch.utils.data.random_split(
             transformed_dataset, [train_size, validation_size], generator=g
         )
 
@@ -370,7 +422,7 @@ if __name__ == "__main__":
             shuffle=False,
             num_workers=8,
         )
-        dataloader["validation"] = DataLoader(
+        dataloader["val"] = DataLoader(
             final_dataset["train"],
             batch_size=args.batch_size,
             shuffle=False,
@@ -389,3 +441,9 @@ if __name__ == "__main__":
         device=device,
         scheduler_bool=args.lr_scheduler,
     )
+    n_models = len([name for name in os.listdir("models")])
+
+    wandb_model.add_file(Path(f"models/model_{n_models}_{wandb.run.name}.pt"))
+    wandb.log_artifact(wandb_model)
+
+    # run.log_artifact(join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"))

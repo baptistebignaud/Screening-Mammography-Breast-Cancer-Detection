@@ -38,7 +38,6 @@ class AugmentationPipeline(object):
         # RandomCrop,
         # horizontal_flip: bool = True,
         # rotation: bool = True,
-        choices: bool = True,
         **methods_args,
     ) -> None:
         """

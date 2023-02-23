@@ -11,6 +11,8 @@ import pandas as pd
 import torch
 from pre_processing import PreProcessingPipeline
 from opencv_transforms import transforms
+from sklearn.preprocessing import LabelBinarizer
+from config import cat_features
 
 
 def load_file(
@@ -107,19 +109,59 @@ class RNSADataset(Dataset):
             ),
             axis=1,
         )
-        self.ohe_columns = pd.get_dummies(
-            df[list(set(features) & set(["machine_id", "laterality", "view"]))],
-            columns=list(set(features) & set(["machine_id", "laterality", "view"])),
-        ).columns
-        df = pd.get_dummies(
-            df,
-            columns=list(set(features) & set(["machine_id", "laterality", "view"])),
-        )
+        self.ohe_columns = []
+        # list(set(features) & set(["machine_id", "laterality", "view"]))
+        ohe_encoders = {}
+        for feature in list(set(features) & set(["machine_id", "laterality", "view"])):
+            # Learn OHE with sklearn to encode categorical features in the future
+            ohe_encoder = LabelBinarizer(sparse_output=False, neg_label=0)
+            ohe_encoder.fit(df[feature].fillna("unknown").astype(str))
+            ohe_encoders[feature] = ohe_encoder
+            if len(ohe_encoders[feature].classes_) > 2:
+                cols = [
+                    f"{feature}_{str(elem)}" for elem in ohe_encoders[feature].classes_
+                ]
+                df = pd.concat(
+                    [
+                        df,
+                        pd.DataFrame(
+                            ohe_encoders[feature].transform(
+                                df[feature].fillna("unknown").astype(str)
+                            ),
+                            columns=cols,
+                        ).reindex(df.index),
+                    ],
+                    axis=1,
+                ).drop(columns=[feature])
+            else:
+                cols = [feature]
+                df[feature] = ohe_encoders[feature].transform(
+                    df[feature].fillna("unknown").astype(str)
+                )
+
+            self.ohe_columns.append(cols)
+        self.ohe_columns = [elem for sublist in self.ohe_columns for elem in sublist]
+
+        self.ohe_encoders = ohe_encoders
+        # self.ohe_columns = pd.get_dummies(
+        #     df[list(set(features) & set(cat_features))],
+        #     columns=list(set(features) & set(["machine_id", "laterality", "view"])),
+        # ).columns
+        # df = pd.get_dummies(
+        #     df,
+        #     columns=list(set(features) & set(["machine_id", "laterality", "view"])),
+        # )
         self.RNSA_frame = df
         self.root_dir = root_dir
         self.transform = transform
         self.features = features
         self.labels = labels
+
+    def get_encoders(self) -> dict:
+        """
+        Return ohe encoders for categorical features.
+        """
+        return self.ohe_encoders
 
     def __len__(self):
         return len(self.RNSA_frame)

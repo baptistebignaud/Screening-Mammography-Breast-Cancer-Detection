@@ -32,6 +32,7 @@ from utils.eval import pfbeta, CustomBCELoss
 from opencv_transforms import transforms
 
 import wandb
+import pickle
 
 
 def train_model(
@@ -44,6 +45,7 @@ def train_model(
     include_wandb: bool = False,
     device: str = "cpu",
     scheduler_bool: bool = False,
+    wandb_model=None,
 ) -> tuple:
     """
     Function to train models and keeps track of training
@@ -173,6 +175,7 @@ def train_model(
                             # join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"),
                             f"models/model_{n_models+1}_{wandb.run.name}.pt",
                         )
+                        wandb.log_artifact(wandb_model)
                     best_pf1 = epoch_pf1
             if include_wandb:
                 wandb.log(
@@ -290,6 +293,14 @@ if __name__ == "__main__":
             freeze_backbone=args.freeze_backbone,
         )
     if args.wandb:
+        s = "no " if not (args.stratified_sampling and args.multinomial_sampler) else ""
+        f = "with" if args.include_features else "without"
+        a = "with" if args.basic_augmentation else "without"
+        wandb.run.name = f"Run with model {args.model} on {args.num_epochs} epochs and batch size of {args.batch_size} with {s} sampling {a} augmentation {f} features with penalization of false negatives of ratio {args.BCE_weights}"
+        wandb.watch(model, log_freq=100)
+        wandb.config = args
+
+    if args.wandb:
         wandb_data = wandb.Artifact(
             name="RNSA_dataset",
             type="dataset",
@@ -318,7 +329,26 @@ if __name__ == "__main__":
                 else ResNet_str,
             },
         )
+        n_models = len([name for name in os.listdir("models")])
+        torch.save(
+            {
+                "model": 0,
+                "epoch": 0,
+                "model_state_dict": 0,
+                "optimizer_state_dict": 0,
+                "loss": 0,
+                "pf1": 0,
+            },
+            # join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"),
+            f"models/model_{n_models+1}_{wandb.run.name}.pt",
+        )
+        n_encoders = len([name for name in os.listdir("ohe_encoders")])
+        with open(f"ohe_encoders/encoder_{n_encoders}.pkl", "wb") as fp:
+            pickle.dump(transformed_dataset.get_encoders(), fp)
+        wandb_data.add_file(Path(f"ohe_encoders/encoder_{n_encoders}.pkl"))
         wandb.log_artifact(wandb_data)
+    else:
+        wandb_model = None
     # Avoid having weights with multinomial sampler
     if args.multinomial_sampler:
         args.BCE_weights = args.multinomial_sampler_BCE_weights
@@ -343,13 +373,6 @@ if __name__ == "__main__":
     #     num_runs = len(runs)
     # except:
     #     num_runs = 0
-    if args.wandb:
-        s = "no " if not (args.stratified_sampling and args.multinomial_sampler) else ""
-        f = "with" if args.include_features else "without"
-        a = "with" if args.basic_augmentation else "without"
-        wandb.run.name = f"Run with model {args.model} on {args.num_epochs} epochs and batch size of {args.batch_size} with {s} sampling {a} augmentation {f} features with penalization of false negatives of ratio {args.BCE_weights}"
-        wandb.watch(model, log_freq=100)
-        wandb.config = args
 
     # If stratified sampling (to have the same ratio for classes between each batch)
     if args.stratified_sampling or args.multinomial_sampler:
@@ -430,6 +453,8 @@ if __name__ == "__main__":
         )
     # if device == "cuda":
     #     model.to(torch.device("cuda"))
+    if args.wandb:
+        wandb_model.add_file(Path(f"models/model_{n_models+1}_{wandb.run.name}.pt"))
     train_model(
         model=model,
         dataloaders=dataloader,
@@ -440,10 +465,5 @@ if __name__ == "__main__":
         include_wandb=args.wandb,
         device=device,
         scheduler_bool=args.lr_scheduler,
+        wandb_model=wandb_model,
     )
-    n_models = len([name for name in os.listdir("models")])
-
-    wandb_model.add_file(Path(f"models/model_{n_models}_{wandb.run.name}.pt"))
-    wandb.log_artifact(wandb_model)
-
-    # run.log_artifact(join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"))

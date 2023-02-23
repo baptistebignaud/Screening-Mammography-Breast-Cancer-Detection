@@ -86,3 +86,6 @@ scheduler_params = {"mode": "min", "factor": 0.1, "patience": 5}
 
 def set_schduler(optimizer):
     return scheduler(optimizer, **scheduler_params)
+
+
+cat_features = ["machine_id", "laterality", "view"]

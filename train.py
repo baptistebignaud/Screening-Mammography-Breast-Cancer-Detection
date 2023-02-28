@@ -34,6 +34,11 @@ from opencv_transforms import transforms
 import wandb
 import pickle
 
+import yaml
+
+with open(r"private_config.yml") as file:
+    yml_config_dict = yaml.load(file, Loader=yaml.FullLoader)
+
 
 def train_model(
     model: nn.Module,
@@ -46,6 +51,7 @@ def train_model(
     device: str = "cpu",
     scheduler_bool: bool = False,
     wandb_model=None,
+    n_models: int = 1,
 ) -> tuple:
     """
     Function to train models and keeps track of training
@@ -159,10 +165,9 @@ def train_model(
 
             if phase == "val":
 
-                if epoch_pf1 > best_pf1:
+                if epoch_pf1 >= best_pf1:
                     if include_wandb:
                         print("saving model")
-                        n_models = len([name for name in os.listdir("models")])
                         torch.save(
                             {
                                 "model": model,
@@ -175,7 +180,9 @@ def train_model(
                             # join(wandb.run.dir, f"{args.model}_{wandb.run.name}.pt"),
                             f"models/model_{n_models+1}_{wandb.run.name}.pt",
                         )
+
                         wandb.log_artifact(wandb_model)
+                        wandb_model.wait()
                     best_pf1 = epoch_pf1
             if include_wandb:
                 wandb.log(
@@ -202,8 +209,11 @@ def train_model(
     return model  # , val_pf1_history
 
 
-if __name__ == "__main__":
+############################### Main ###############################
 
+
+if __name__ == "__main__":
+    n_models = None
     # Avoid useless warnings
     warnings.filterwarnings("ignore")
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -213,7 +223,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.wandb:
         wandb.login()
-        wandb.init(project="Kaggle_ RSNA", entity="turboteam")
+        wandb.init(
+            project=yml_config_dict["wandb_project"],
+            entity=yml_config_dict["wandb_entity"],
+        )
 
     g = torch.Generator()
     if args.seed:
@@ -332,9 +345,9 @@ if __name__ == "__main__":
         n_models = len([name for name in os.listdir("models")])
         torch.save(
             {
-                "model": 0,
+                "model": model,
                 "epoch": 0,
-                "model_state_dict": 0,
+                "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": 0,
                 "loss": 0,
                 "pf1": 0,
@@ -367,12 +380,6 @@ if __name__ == "__main__":
     model.to(device)
     # Define optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # if args.wandb:
-    #     runs = wandb.Api().runs()
-    # try:
-    #     num_runs = len(runs)
-    # except:
-    #     num_runs = 0
 
     # If stratified sampling (to have the same ratio for classes between each batch)
     if args.stratified_sampling or args.multinomial_sampler:
@@ -466,4 +473,5 @@ if __name__ == "__main__":
         device=device,
         scheduler_bool=args.lr_scheduler,
         wandb_model=wandb_model,
+        n_models=n_models,
     )

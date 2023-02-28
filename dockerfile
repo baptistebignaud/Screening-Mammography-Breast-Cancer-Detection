@@ -1,16 +1,18 @@
 ARG UBUNTU_VERSION=20.04
-ARG CUDA=11.2
+# ARG CUDA=11.2
 #FROM nvcr.io/nvidia/tensorflow:21.08-tf2-py3
-FROM nvcr.io/nvidia/pytorch:22.12-py3
+# FROM nvcr.io/nvidia/pytorch:22.12-py3
+FROM nvcr.io/nvidia/pytorch:22.01-py3
 # FROM nvidia/cuda${ARCH:+-$ARCH}:${CUDA}-devel-ubuntu${UBUNTU_VERSION} as base
 # CMD nvidia-smi
 ARG PYTHON_VERSION=3.8
 ARG DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y --no-install-recommends --no-install-suggests \
     python${PYTHON_VERSION} \
     python3-pip \
-    python${PYTHON_VERSION}-dev \
-    python3.8-dev\
+    # python${PYTHON_VERSION}-dev \
+    # python3.8-dev\
     unixodbc-dev\
     build-essential\
     graphviz\

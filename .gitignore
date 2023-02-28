@@ -14,8 +14,8 @@ __pycache__/
 
 /utils/wandb
 ohe_encoders
-src/*
 /wandb
 /models
+private_config.yml
 
 
